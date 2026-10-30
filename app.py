@@ -1,3 +1,6 @@
+import base64
+import os
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -19,10 +22,22 @@ COORD = {  # latitude, longitude des gouvernorats
 }
 
 st.set_page_config(page_title="GeoPulse", page_icon="📡", layout="wide")
+def img_b64(path):
+    if os.path.exists(path):
+        with open(path, "rb") as fh:
+            return base64.b64encode(fh.read()).decode()
+    return None
+
+
+_lg, _lo = img_b64("logo_geopulse.png"), img_b64("logo_orange.png")
+_left = f"<img src='data:image/png;base64,{_lg}' style='height:84px;border-radius:50%;margin-right:18px'>" if _lg else ""
+_right = f"<img src='data:image/png;base64,{_lo}' style='height:64px'>" if _lo else ""
 st.markdown(
-    "<div style='background:#000;padding:14px 20px;border-bottom:4px solid #E8703A'>"
-    "<h2 style='color:#fff;margin:0'>GeoPulse | Telecom Geomarketing Intelligence</h2>"
-    "<span style='color:#fff'>Transformer les données géographiques en décisions commerciales intelligentes.</span></div>",
+    "<div style='background:#000;padding:12px 20px;border-bottom:4px solid #E8703A;display:flex;align-items:center;justify-content:space-between'>"
+    f"<div style='display:flex;align-items:center'>{_left}<div>"
+    "<h2 style='color:#fff;margin:0;padding:0'>GeoPulse | Telecom Geomarketing Intelligence</h2>"
+    "<span style='color:#fff'>Transformer les données géographiques en décisions commerciales intelligentes.</span></div></div>"
+    f"{_right}</div>",
     unsafe_allow_html=True,
 )
 
