@@ -1,7 +1,8 @@
-"""Convertit l'export Excel en data/data.csv agrégé (à relancer quand l'Excel change).
+"""Convertit l'export Excel en data.csv agrégé (à relancer quand l'Excel change).
 Usage : python prepare_data.py Projet_Pbi_Big_data.xlsx
 Règles reconstituées depuis le rapport Power BI :
   base_actif = somme(base x flag_30) | churn = somme(base x flag_churn_30) | rev_actif = somme(recharge x flag_30)
+  ga_30 = somme(base x flag_ga_30)   | react_30 = somme(base x flag_react_30)
 """
 import sys
 import pandas as pd
@@ -12,8 +13,10 @@ d["localisation"] = d["localisation"].fillna("NON RENSEIGNÉ")
 d["base_actif"] = d["base"] * d["flag_30"]
 d["churn"] = d["base"] * d["flag_churn_30"]
 d["rev_actif"] = d["recharge"] * d["flag_30"]
+d["ga_30"] = d["base"] * d["flag_ga_30"]
+d["react_30"] = d["base"] * d["flag_react_30"]
 out = (d.groupby(["mois", "localisation", "prgname", "ligne_pdt", "type_offre"], as_index=False)
-         [["base_actif", "churn", "rev_actif"]].sum()
+         [["base_actif", "churn", "rev_actif", "ga_30", "react_30"]].sum()
          .rename(columns={"mois": "date", "localisation": "gouvernorat", "prgname": "programme", "ligne_pdt": "ligne_produit"}))
-out.to_csv("data/data.csv", index=False)
-print(len(out), "lignes -> data/data.csv")
+out.to_csv("data.csv", index=False)
+print(len(out), "lignes -> data.csv")
