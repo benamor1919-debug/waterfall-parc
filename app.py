@@ -186,6 +186,8 @@ def detail(col):
     reg_prev = agg(f[f["date"] == prev_d], "gouvernorat")
     r = reg[col].drop("NON RENSEIGNÉ", errors="ignore")
     rp = reg_prev[col].reindex(r.index)
+    reg_yago = agg(f[f["date"] == yago_d], "gouvernorat")
+    ry = reg_yago[col].reindex(r.index)
 
     c1, c2 = st.columns([3, 2])
     with c1:
@@ -196,8 +198,8 @@ def detail(col):
         mp["valeur_txt"] = mp["valeur"].map(human)
         fig = px.scatter_map(mp, lat="lat", lon="lon", size="taille", hover_name="gouvernorat",
                              hover_data={"valeur_txt": True, "lat": False, "lon": False, "taille": False},
-                             size_max=35, zoom=5.2, center={"lat": 34.0, "lon": 9.5},
-                             map_style="open-street-map", height=520, color_discrete_sequence=["#1E90FF"])
+                             size_max=35, zoom=5.5, center={"lat": 33.9, "lon": 9.5},
+                             map_style="open-street-map", height=600, color_discrete_sequence=["#1E90FF"])
         fig.update_traces(marker=dict(opacity=0.7))
         fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
         st.plotly_chart(fig, use_container_width=True, key=f"map_{col}")
@@ -205,17 +207,25 @@ def detail(col):
         st.markdown(f"**{title} · évolution mensuelle**")
         st.plotly_chart(evo_chart(s), use_container_width=True, key=f"evo_{col}")
 
-    d1, d2 = st.columns(2)
+    d1, d2, d3 = st.columns(3)
+    good, bad = ("#E74C3C", "#2ECC71") if col == "churn" else ("#2ECC71", "#E74C3C")
     with d1:
         st.markdown(f"**Classement des régions · {title}**")
         rk = r.dropna().sort_values()
         st.plotly_chart(hbar(rk, 640), use_container_width=True, key=f"rank_{col}")
     with d2:
-        st.markdown(f"**Régions · MoM ({fm(prev_d)} → {fm(mois_sel)})**")
+        st.markdown(f"**Régions · MoM** ({fm(prev_d)} → {fm(mois_sel)})")
         mom = (r - rp).dropna().sort_values()
-        good, bad = ("#E74C3C", "#2ECC71") if col == "churn" else ("#2ECC71", "#E74C3C")
         st.plotly_chart(hbar(mom, 640, [good if v >= 0 else bad for v in mom.values]),
                         use_container_width=True, key=f"mom_{col}")
+    with d3:
+        st.markdown(f"**Régions · YoY** ({fm(yago_d)} → {fm(mois_sel)})")
+        yoy = (r - ry).dropna().sort_values()
+        if yoy.empty:
+            st.info("Pas de données pour le même mois de l'année précédente.")
+        else:
+            st.plotly_chart(hbar(yoy, 640, [good if v >= 0 else bad for v in yoy.values]),
+                            use_container_width=True, key=f"yoy_{col}")
 
 
 for tab, col in zip(tabs[2:], ["base_actif", "churn", "rev_actif", "arpu"]):
