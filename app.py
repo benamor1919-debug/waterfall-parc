@@ -14,7 +14,7 @@ st.markdown(
 
 @st.cache_data
 def load():
-    return pd.read_csv("data/data.csv", parse_dates=["date"])
+    return pd.read_csv("data.csv", parse_dates=["date"])
 
 df = load()
 
