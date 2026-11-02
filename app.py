@@ -109,14 +109,14 @@ def show_delta(container, label, cur, ref, col):
 def evo_chart(s):
     fig = go.Figure(go.Bar(x=[fm(d) for d in s.index], y=s.values, marker_color=ORANGE,
                            text=[human(v) for v in s.values], textposition="outside"))
-    fig.update_layout(height=300, margin=dict(t=20, b=10, l=10, r=10), yaxis_visible=False)
+    fig.update_layout(height=300, margin=dict(t=30, b=10, l=10, r=10), yaxis_visible=False)
     return fig
 
 
 def hbar(s, height, colors=None):
     fig = go.Figure(go.Bar(x=s.values, y=s.index, orientation="h", marker_color=colors or ORANGE,
                            text=[human(v) for v in s.values], textposition="outside"))
-    fig.update_layout(height=height, margin=dict(t=10, b=10, l=10, r=40), xaxis_visible=False)
+    fig.update_layout(height=height, margin=dict(t=30, b=10, l=10, r=40), xaxis_visible=False)
     return fig
 
 
