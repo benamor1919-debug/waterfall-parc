@@ -64,6 +64,7 @@ st.set_page_config(page_title="GeoPulse", page_icon="📡", layout="wide")
 # ---- Style (barre latérale + onglets) : tout est piloté par les paramètres ci-dessus ----
 _CSS = Template("""
 <style>
+/* NB : ne jamais utiliser le caractère supérieur-à dans ce CSS */
 /* ===== Barre latérale ===== */
 [data-testid="stSidebar"] { background-color: ${SB_BG}; }
 [data-testid="stSidebarUserContent"] { padding-left: ${SB_PADDING}px !important; padding-right: ${SB_PADDING}px !important; }
@@ -72,8 +73,11 @@ _CSS = Template("""
 [data-testid="stSidebar"] label p {
     font-size: ${SB_LABEL_SIZE}px !important; font-weight: 800 !important; color: #000 !important;
 }
-[data-testid="stSidebar"] [data-baseweb="select"] > div {
-    min-height: ${SB_FIELD_HEIGHT}px; background-color: #FFFFFF; border: 2px solid #9AA3AF; color: #000;
+[data-testid="stSidebar"] [data-baseweb="select"] div {
+    min-height: ${SB_FIELD_HEIGHT}px; color: #000;
+}
+[data-testid="stSidebar"] [data-baseweb="select"] {
+    background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 0 0 2px #9AA3AF;
 }
 [data-testid="stSidebar"] [data-baseweb="select"] * { font-size: ${SB_VALUE_SIZE}px !important; font-weight: 700 !important; }
 [data-testid="stSidebar"] [data-baseweb="select"] input::placeholder {
@@ -106,7 +110,11 @@ button[data-baseweb="tab"][aria-selected="true"] span,
 [data-baseweb="tab-border"] { background-color: transparent !important; }
 </style>
 """)
-st.markdown(_CSS.safe_substitute(globals()), unsafe_allow_html=True)
+_css_txt = _CSS.safe_substitute(globals())
+if hasattr(st, "html"):
+    st.html(_css_txt)  # injection directe du CSS (plus fiable que st.markdown)
+else:
+    st.markdown(_css_txt, unsafe_allow_html=True)
 
 
 def img_b64(path):
