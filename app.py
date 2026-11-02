@@ -15,7 +15,7 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
-APP_VERSION = "v6"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+APP_VERSION = "v7"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
 
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
@@ -48,6 +48,17 @@ TAB_BG = "#F3F4F6"         # fond des onglets
 TAB_TEXT = "#374151"       # texte des onglets
 TAB_ACTIVE_BG = ORANGE     # fond de l'onglet actif
 TAB_ACTIVE_TEXT = "#FFFFFF"  # texte de l'onglet actif
+
+# --- Look général de la page ---
+PAGE_BG = "#F1F3F6"        # fond de la page
+CARD_BG = "#FFFFFF"        # fond des cartes (graphiques, indicateurs)
+CARD_RADIUS = 16           # arrondi des cartes (px)
+CARD_SHADOW = "0 4px 14px rgba(0,0,0,0.10)"  # ombre des cartes
+SUBTITLE_SIZE = 28         # grands titres (ex. "Base active · évolution mensuelle")
+CHART_TITLE_SIZE = 20      # titres au-dessus des graphiques et de la carte
+METRIC_LABEL_SIZE = 18     # petit titre des indicateurs (MoM, YoY...)
+METRIC_VALUE_SIZE = 38     # grand chiffre des indicateurs
+METRIC_DELTA_SIZE = 16     # pourcentage sous l'indicateur
 # =====================================================================
 
 COORD = {  # latitude, longitude des gouvernorats
@@ -66,16 +77,41 @@ st.set_page_config(page_title="GeoPulse", page_icon="📡", layout="wide")
 # ---- Style (barre latérale + onglets) : tout est piloté par les paramètres ci-dessus ----
 _NOT_TAG = ':not([data-baseweb="tag"]):not([data-baseweb="tag"] *)'
 _CSS = Template("""
+/* ===== Page ===== */
+.stApp { background-color: ${PAGE_BG}; }
+[data-testid="stHeader"] { background: transparent; }
+.stApp h3 {
+    font-size: ${SUBTITLE_SIZE}px !important; font-weight: 800 !important; color: #111 !important;
+    border-left: 7px solid ${ORANGE}; padding-left: 12px !important; margin-top: 10px;
+}
+.stApp h4 { font-weight: 800 !important; color: #111 !important; }
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] strong { font-size: ${CHART_TITLE_SIZE}px; color: #111; }
+[data-testid="stMain"] [data-testid="stWidgetLabel"] p { font-size: 18px !important; font-weight: 700 !important; color: #111 !important; }
+[data-testid="stMain"] [data-baseweb="select"] * { font-size: 18px !important; font-weight: 700 !important; }
+
+/* ===== Cartes : graphiques et indicateurs ===== */
+[data-testid="stPlotlyChart"] {
+    background: ${CARD_BG}; border-radius: ${CARD_RADIUS}px; box-shadow: ${CARD_SHADOW}; padding: 10px; margin-bottom: 10px;
+}
+[data-testid="stMetric"] {
+    background: ${CARD_BG}; border-radius: ${CARD_RADIUS}px; box-shadow: ${CARD_SHADOW};
+    padding: 14px 18px; border-left: 7px solid ${ORANGE}; margin-bottom: 10px;
+}
+[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { font-size: ${METRIC_LABEL_SIZE}px !important; font-weight: 700 !important; color: #4B5563 !important; }
+[data-testid="stMetricValue"], [data-testid="stMetricValue"] * { font-size: ${METRIC_VALUE_SIZE}px !important; font-weight: 800 !important; color: #000 !important; }
+[data-testid="stMetricDelta"], [data-testid="stMetricDelta"] * { font-size: ${METRIC_DELTA_SIZE}px !important; font-weight: 700 !important; }
+
 /* ===== Barre latérale ===== */
-[data-testid="stSidebar"] { background-color: ${SB_BG}; }
+[data-testid="stSidebar"] { background-color: ${SB_BG}; box-shadow: 2px 0 10px rgba(0,0,0,0.08); }
 [data-testid="stSidebarUserContent"] { padding-left: ${SB_PADDING}px !important; padding-right: ${SB_PADDING}px !important; }
-[data-testid="stSidebar"] h2 { font-size: ${SB_TITLE_SIZE}px !important; font-weight: 800 !important; color: #000 !important; }
+[data-testid="stSidebar"] h2 {
+    font-size: ${SB_TITLE_SIZE}px !important; font-weight: 800 !important; color: #000 !important;
+    border-bottom: 4px solid ${ORANGE}; padding-bottom: 8px !important; display: inline-block;
+}
 [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
 [data-testid="stSidebar"] label p {
     font-size: ${SB_LABEL_SIZE}px !important; font-weight: 800 !important; color: #000 !important;
 }
-
-/* Contenu des champs (Choose options, août 2026, ...) */
 [data-testid="stSidebar"] [data-testid="stSelectbox"] *,
 [data-testid="stSidebar"] [data-testid="stMultiSelect"] *,
 [data-testid="stSidebar"] [data-baseweb="select"] *,
@@ -84,17 +120,10 @@ _CSS = Template("""
     font-size: ${SB_VALUE_SIZE}px !important; font-weight: 700 !important;
 }
 [data-testid="stSidebar"] input::placeholder { color: #374151 !important; opacity: 1 !important; font-weight: 700 !important; font-size: ${SB_VALUE_SIZE}px !important; }
-[data-testid="stSidebar"] [data-testid="stSelectbox"] div${_NOT_TAG},
-[data-testid="stSidebar"] [data-testid="stMultiSelect"] div${_NOT_TAG},
 [data-testid="stSidebar"] [data-baseweb="select"] div${_NOT_TAG} { min-height: ${SB_FIELD_HEIGHT}px; }
-[data-testid="stSidebar"] [data-baseweb="select"],
-[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] { background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 0 0 2px #9AA3AF; }
-
-/* Valeurs sélectionnées (ex. ARIANA) */
+[data-testid="stSidebar"] [data-baseweb="select"] { background-color: #FFFFFF; border-radius: 10px; box-shadow: 0 0 0 2px #9AA3AF; }
 [data-testid="stSidebar"] [data-baseweb="tag"],
 [data-testid="stSidebar"] [data-baseweb="tag"] * { font-size: ${SB_TAG_SIZE}px !important; font-weight: 700 !important; min-height: 0 !important; }
-
-/* Liste déroulante des options (affichée hors de la barre latérale) */
 [data-baseweb="popover"] li, [data-baseweb="popover"] li *,
 [role="listbox"] *, [role="option"], [role="option"] *,
 [data-testid="stSelectboxVirtualDropdown"] * {
@@ -103,16 +132,16 @@ _CSS = Template("""
 
 /* ===== Onglets ===== */
 [role="tablist"], [data-baseweb="tab-list"] { gap: ${TAB_GAP}px !important; border-bottom: 3px solid ${TAB_ACTIVE_BG} !important; padding-top: 8px; }
-button[role="tab"], button[data-baseweb="tab"], button[data-testid="stTab"] {
+[role="tab"], [data-baseweb="tab"], [data-testid="stTab"] {
     height: ${TAB_HEIGHT}px !important; padding: 0 ${TAB_PADDING_X}px !important; background-color: ${TAB_BG} !important;
     border-radius: 12px 12px 0 0 !important; transition: all 0.2s ease;
 }
-button[role="tab"], button[role="tab"] *, button[data-baseweb="tab"] *, button[data-testid="stTab"] * {
+[role="tab"], [role="tab"] *, [data-baseweb="tab"] *, [data-testid="stTab"] * {
     font-size: ${TAB_FONT_SIZE}px !important; font-weight: 800 !important; color: ${TAB_TEXT} !important;
 }
-button[role="tab"]:hover { background-color: #FDE5D8 !important; }
-button[role="tab"][aria-selected="true"] { background-color: ${TAB_ACTIVE_BG} !important; }
-button[role="tab"][aria-selected="true"], button[role="tab"][aria-selected="true"] * { color: ${TAB_ACTIVE_TEXT} !important; }
+[role="tab"]:hover { background-color: #FDE5D8 !important; }
+[role="tab"][aria-selected="true"] { background-color: ${TAB_ACTIVE_BG} !important; }
+[role="tab"][aria-selected="true"], [role="tab"][aria-selected="true"] * { color: ${TAB_ACTIVE_TEXT} !important; }
 [data-baseweb="tab-highlight"] { background-color: #000000 !important; height: 4px !important; }
 [data-baseweb="tab-border"] { background-color: transparent !important; }
 """)
@@ -144,7 +173,7 @@ _lg, _lo = img_b64("logo_geopulse.png"), img_b64("logo_orange.png")
 _left = f"<img src='data:image/png;base64,{_lg}' style='height:84px;border-radius:50%;margin-right:18px'>" if _lg else ""
 _right = f"<img src='data:image/png;base64,{_lo}' style='height:64px'>" if _lo else ""
 st.markdown(
-    "<div style='background:#000;padding:12px 20px;border-bottom:4px solid #E8703A;display:flex;align-items:center;justify-content:space-between'>"
+    "<div style='background:#000;padding:14px 24px;border-bottom:5px solid #E8703A;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,0.25);margin-bottom:18px;display:flex;align-items:center;justify-content:space-between'>"
     f"<div style='display:flex;align-items:center'>{_left}<div>"
     "<h2 style='color:#fff;margin:0;padding:0'>GeoPulse | Telecom Geomarketing Intelligence</h2>"
     "<span style='color:#fff'>Transformer les données géographiques en décisions commerciales intelligentes.</span></div></div>"
@@ -228,8 +257,8 @@ def evo_chart(s):
         text=[bold(human(v)) for v in s.values], textposition="outside",
         textfont=dict(size=FS_EVO, color=NUM_COLOR), outsidetextfont=dict(size=FS_EVO, color=NUM_COLOR),
         cliponaxis=False))
-    fig.update_layout(height=360, margin=dict(t=60, b=10, l=10, r=10), yaxis_visible=False,
-                      xaxis=dict(tickfont=dict(size=FS_EVO_AXIS)))
+    fig.update_layout(height=360, margin=dict(t=60, b=10, l=10, r=10), yaxis_visible=False, bargap=0.35,
+                      xaxis=dict(tickfont=dict(size=FS_EVO_AXIS), showgrid=False))
     return fig
 
 
@@ -239,8 +268,8 @@ def hbar(s, height, colors=None):
         text=[bold(human(v)) for v in s.values], textposition="outside",
         textfont=dict(size=FS_HBAR, color=NUM_COLOR), outsidetextfont=dict(size=FS_HBAR, color=NUM_COLOR),
         cliponaxis=False))
-    fig.update_layout(height=height, margin=dict(t=30, b=10, l=70, r=90), xaxis_visible=False,
-                      yaxis=dict(tickfont=dict(size=FS_HBAR_AXIS), automargin=True))
+    fig.update_layout(height=height, margin=dict(t=30, b=10, l=70, r=90), xaxis_visible=False, bargap=0.3,
+                      yaxis=dict(tickfont=dict(size=FS_HBAR_AXIS), automargin=True, showgrid=False))
     return fig
 
 
@@ -294,8 +323,8 @@ with tabs[1]:
         filt = " - ".join(" + ".join(v) for v in sel.values() if v)
         diff = end - start
         fig.update_layout(title=f"Waterfall Parc MoM {fm(d_from)} → {fm(d_to)}" + (f" | {filt}" if filt else ""),
-                          height=560, showlegend=False, yaxis_visible=False, margin=dict(t=90, b=20),
-                          xaxis=dict(tickfont=dict(size=FS_WATERFALL_AXIS)))
+                          height=560, showlegend=False, yaxis_visible=False, margin=dict(t=90, b=20), bargap=0.3, title_font=dict(size=22),
+                          xaxis=dict(tickfont=dict(size=FS_WATERFALL_AXIS), showgrid=False))
         fig.add_annotation(x=xs[3], y=start * 0.5, showarrow=False,
                            font=dict(size=FS_WATERFALL_DELTA, color="#27AE60" if diff >= 0 else "#E74C3C"),
                            text=f"<b>Δ {space(diff)} ({diff / start * 100:+.2f}%)</b>")
