@@ -1,4 +1,5 @@
 import base64
+import functools
 import json
 import os
 from string import Template
@@ -16,7 +17,7 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
-APP_VERSION = "v16"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+APP_VERSION = "v17"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
 
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
@@ -173,19 +174,19 @@ _CSS = Template("""
 [role="tab"][aria-selected="true"], [role="tab"][aria-selected="true"] * { color: ${TAB_ACTIVE_TEXT} !important; }
 [data-baseweb="tab-highlight"] { background-color: #000000 !important; height: 4px !important; }
 [data-baseweb="tab-border"] { background-color: transparent !important; }
-/* ===== Navigation (radio horizontal stylé comme des onglets) ===== */
-.st-key-nav [role="radiogroup"] { gap: ${TAB_GAP}px !important; border-bottom: 3px solid ${TAB_ACTIVE_BG}; padding-top: 8px; flex-wrap: wrap; }
-.st-key-nav label[data-baseweb="radio"] {
-    height: ${TAB_HEIGHT}px; padding: 0 ${TAB_PADDING_X}px !important; margin: 0 !important; background-color: ${TAB_BG};
-    border-radius: 12px 12px 0 0; align-items: center; cursor: pointer; transition: all 0.2s ease;
+/* ===== Navigation (boutons stylés comme des onglets) ===== */
+.st-key-nav { border-bottom: 3px solid ${TAB_ACTIVE_BG}; padding-top: 8px; }
+.st-key-nav button {
+    height: ${TAB_HEIGHT}px !important; border: none !important; box-shadow: none !important;
+    border-radius: 12px 12px 0 0 !important; background-color: ${TAB_BG} !important; transition: all 0.2s ease;
 }
-.st-key-nav label[data-baseweb="radio"] > div:first-child { display: none !important; }
-.st-key-nav label[data-baseweb="radio"] p {
+.st-key-nav button p, .st-key-nav button div {
     font-size: ${TAB_FONT_SIZE}px !important; font-weight: 800 !important; color: ${TAB_TEXT} !important; margin: 0 !important;
 }
-.st-key-nav label[data-baseweb="radio"]:hover { background-color: #FDE5D8; }
-.st-key-nav label[data-baseweb="radio"]:has(input:checked) { background-color: ${TAB_ACTIVE_BG}; }
-.st-key-nav label[data-baseweb="radio"]:has(input:checked) p { color: ${TAB_ACTIVE_TEXT} !important; }
+.st-key-nav button:hover { background-color: #FDE5D8 !important; }
+.st-key-nav button[kind="primary"], .st-key-nav [data-testid="stBaseButton-primary"] { background-color: ${TAB_ACTIVE_BG} !important; }
+.st-key-nav button[kind="primary"] p, .st-key-nav button[kind="primary"] div,
+.st-key-nav [data-testid="stBaseButton-primary"] p, .st-key-nav [data-testid="stBaseButton-primary"] div { color: ${TAB_ACTIVE_TEXT} !important; }
 """)
 _css_txt = _CSS.safe_substitute(globals())
 
@@ -279,7 +280,7 @@ with st.sidebar:
                        ("ligne_produit", "Ligne de produit"), ("type_offre", "Type d'offre")]:
         sel[col] = st.multiselect(label, sorted(df[col].unique()))
     mois_sel = st.selectbox("Mois des KPI et de la carte", dates, index=len(dates) - 1, format_func=fm)
-    multi_click = st.toggle("Sélection multiple sur la carte", value=False,
+    multi_click = st.toggle("Sélection multiple sur la carte", value=False, key="multi_click",
                             help="Activé : chaque clic ajoute/retire un gouvernorat. Désactivé : un clic remplace la sélection.")
     st.caption(f"Version du code : {APP_VERSION}")
 
@@ -362,9 +363,21 @@ if geo_sel:
     cB.button("✖ Effacer", key="clear_geo", on_click=set_geo, args=([],))
 
 PAGES = ["VUE 360", "Waterfall", "Base active", "Churn", "Revenu actif", "ARPU"]
-# st.radio garde la page active après un st.rerun() (contrairement à st.tabs qui revenait sur VUE 360)
+if "page" not in st.session_state:
+    st.session_state["page"] = PAGES[0]
+
+
+def go_page(p):
+    st.session_state["page"] = p
+
+
+# Navigation par boutons : la page active est mémorisée, donc plus de retour sur VUE 360 après un clic sur la carte
 with st.container(key="nav"):
-    page = st.radio("Page", PAGES, horizontal=True, key="page", label_visibility="collapsed")
+    _nc = st.columns([1] * len(PAGES) + [2])
+    for _c, _p in zip(_nc, PAGES):
+        _c.button(_p, key=f"nav_{_p}", on_click=go_page, args=(_p,), use_container_width=True,
+                  type="primary" if st.session_state["page"] == _p else "secondary")
+page = st.session_state["page"]
 
 # ---------------- VUE 360 ----------------
 if page == "VUE 360":
@@ -488,22 +501,26 @@ def build_map(mp, title, zoomed, focus, selected):
     return fig
 
 
-def clicked_names(pts, mp):
-    """Noms des gouvernorats cliqués (lus dans customdata, sinon via l'index du point)."""
-    out = []
-    names = set(mp["gouvernorat"])
+def on_map_select(col):
+    """Exécuté AVANT le rendu de la page : met à jour le filtre puis la page est dessinée une seule fois."""
+    ver = st.session_state["mapver"]
+    try:
+        pts = st.session_state[f"map_{col}_{ver}"]["selection"]["points"]
+    except Exception:
+        return
+    clicked = []
     for p in pts:
-        name = None
         cd = p.get("customdata")
-        if cd is not None and len(cd) > 1 and cd[1] in names:
-            name = cd[1]
-        elif p.get("curve_number") in (1, 2):
-            idx = p.get("point_index", p.get("point_number"))
-            if idx is not None and 0 <= idx < len(mp):
-                name = mp.iloc[idx]["gouvernorat"]
-        if name and name not in out:
-            out.append(name)
-    return out
+        if cd is not None and len(cd) > 1 and cd[1] not in clicked:
+            clicked.append(cd[1])
+    if not clicked:
+        return
+    cur_sel = list(st.session_state["geo_sel"])
+    if st.session_state.get("multi_click"):      # chaque clic ajoute / retire un gouvernorat
+        new = [g for g in cur_sel if g not in clicked] + [g for g in clicked if g not in cur_sel]
+    else:                                        # un clic remplace la sélection ; re-cliquer le même l'efface
+        new = [] if set(clicked) == set(cur_sel) else clicked
+    set_geo(new)
 
 
 # ---------------- Pages détail : Base active / Churn / Revenu actif / ARPU ----------------
@@ -549,28 +566,14 @@ def detail(col):
 
         fig = build_map(mp, title, zoomed, focus, geo_in)
         ver = st.session_state["mapver"]
-        pts = []
         if MAP_CLICK_FILTER:
             try:
-                ev = st.plotly_chart(fig, use_container_width=True, key=f"map_{col}_{ver}",
-                                     on_select="rerun", selection_mode="points")
-                pts = ev["selection"]["points"]
+                st.plotly_chart(fig, use_container_width=True, key=f"map_{col}_{ver}",
+                                on_select=functools.partial(on_map_select, col), selection_mode="points")
             except Exception:  # ancienne version de Streamlit : pas de clic, on affiche simplement la carte
                 st.plotly_chart(fig, use_container_width=True, key=f"map_{col}_{ver}_ro")
-                pts = []
         else:
             st.plotly_chart(fig, use_container_width=True, key=f"map_{col}_{ver}_ro")
-
-        clicked = clicked_names(pts, mp)
-        sigk = f"mapsig_{col}_{ver}"
-        if clicked and st.session_state.get(sigk) != tuple(clicked):
-            st.session_state[sigk] = tuple(clicked)
-            if multi_click:      # chaque clic ajoute / retire un gouvernorat
-                new = [g for g in geo_sel if g not in clicked] + [g for g in clicked if g not in geo_sel]
-            else:                # un clic remplace la sélection ; re-cliquer le même gouvernorat l'efface
-                new = [] if set(clicked) == set(geo_sel) else clicked
-            set_geo(new)
-            st.rerun()
         st.caption("💡 Clique sur une bulle pour filtrer tous les graphiques · re-clique pour annuler · "
                    "outil lasso/rectangle de la carte pour en choisir plusieurs.")
     with c2:
