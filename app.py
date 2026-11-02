@@ -15,7 +15,7 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
-APP_VERSION = "v11"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+APP_VERSION = "v12"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
 
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
@@ -55,7 +55,8 @@ TAB_ACTIVE_BG = ORANGE     # fond de l'onglet actif
 TAB_ACTIVE_TEXT = "#FFFFFF"  # texte de l'onglet actif
 
 # --- Carte de Tunisie ---
-MAP_STYLE = "carto-positron"   # fond de carte épuré ("open-street-map" = plus détaillé)
+MAP_TILES = "light_nolabels"   # fond de carte sans noms (propre) : "light_nolabels", "light_all", "voyager_nolabels", "dark_nolabels"
+MAP_CLICK_ZOOM = True          # True = un clic sur une bulle zoome sur ce gouvernorat
 MAP_HEIGHT = 650               # hauteur de la carte (px)
 MAP_TEXT_SIZE = 16             # taille des chiffres sur la carte (vue d'ensemble)
 MAP_TEXT_SIZE_ZOOM = 24        # taille des chiffres quand des gouvernorats sont sélectionnés
@@ -413,22 +414,55 @@ def detail(col):
         mp = mp.rename_axis("gouvernorat").reset_index()
         mp["taille"] = mp["valeur"].clip(lower=0).fillna(0) + 1e-9
         mp["valeur_txt"] = mp["valeur"].map(human)
-        chosen = [g for g in sel.get("gouvernorat", []) if g in set(mp["gouvernorat"])]
-        zoomed = len(chosen) > 0
-        center, zoom = map_view(chosen)
-        # étiquette : nom + chiffre quand on a sélectionné, sinon le chiffre seul
+        names = set(mp["gouvernorat"])
+
+        # --- zoom : filtre "Localisation" en priorité, sinon gouvernorat cliqué sur la carte ---
+        skey, hkey, vkey = f"mapclick_{col}", f"maphandled_{col}", f"mapver_{col}"
+        chosen = [g for g in sel.get("gouvernorat", []) if g in names]
+        clicked = st.session_state.get(skey)
+        focus = chosen if chosen else ([clicked] if clicked in names else [])
+        zoomed = len(focus) > 0
+        center, zoom = map_view(focus)
         mp["etiquette"] = (mp["gouvernorat"] + " : " + mp["valeur_txt"]) if zoomed else mp["valeur_txt"]
+
         fig = px.scatter_map(mp, lat="lat", lon="lon", size="taille", color="valeur", text="etiquette",
-                             hover_name="gouvernorat",
-                             hover_data={"valeur_txt": True, "lat": False, "lon": False, "taille": False, "valeur": False},
-                             size_max=MAP_BUBBLE_MAX, zoom=zoom, center=center,
-                             map_style=MAP_STYLE, height=MAP_HEIGHT,
+                             hover_name="gouvernorat", custom_data=["valeur_txt"],
+                             size_max=MAP_BUBBLE_MAX, zoom=zoom, center=center, height=MAP_HEIGHT,
+                             map_style="white-bg",
                              color_continuous_scale=[[0, MAP_COLOR_LOW], [1, MAP_COLOR_HIGH]])
         fig.update_traces(mode="markers+text", marker=dict(opacity=0.8), textposition="top center",
-                          textfont=dict(size=MAP_TEXT_SIZE_ZOOM if zoomed else MAP_TEXT_SIZE, color="#000000"))
-        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), hoverlabel=dict(font_size=FS_MAP_HOVER),
-                          coloraxis_showscale=False)
-        st.plotly_chart(fig, use_container_width=True, key=f"map_{col}")
+                          textfont=dict(size=MAP_TEXT_SIZE_ZOOM if zoomed else MAP_TEXT_SIZE, color="#000000"),
+                          hovertemplate="<b>%{hovertext}</b><br>" + title + " : <b>%{customdata[0]}</b><extra></extra>")
+        fig.update_layout(
+            margin=dict(t=0, b=0, l=0, r=0), hoverlabel=dict(font_size=FS_MAP_HOVER), coloraxis_showscale=False,
+            map_layers=[dict(below="traces", sourcetype="raster", sourceattribution="© OpenStreetMap © CARTO",
+                             source=[f"https://a.basemaps.cartocdn.com/{MAP_TILES}/{{z}}/{{x}}/{{y}}.png"])])
+
+        if MAP_CLICK_ZOOM:
+            ver = st.session_state.get(vkey, 0)
+            try:
+                ev = st.plotly_chart(fig, use_container_width=True, key=f"map_{col}_{ver}",
+                                     on_select="rerun", selection_mode="points")
+                pts = ev["selection"]["points"]
+            except Exception:  # ancienne version de Streamlit : pas de clic, on affiche simplement la carte
+                st.plotly_chart(fig, use_container_width=True, key=f"map_{col}_{ver}")
+                pts = []
+            if pts:
+                idx = pts[0].get("point_index", pts[0].get("point_number"))
+                if idx is not None and 0 <= idx < len(mp):
+                    name = mp.iloc[idx]["gouvernorat"]
+                    if st.session_state.get(hkey) != name:
+                        st.session_state[hkey] = name
+                        st.session_state[skey] = name
+                        st.rerun()
+            if clicked and not chosen:
+                def _reset():
+                    st.session_state.pop(skey, None)
+                    st.session_state.pop(hkey, None)
+                    st.session_state[vkey] = st.session_state.get(vkey, 0) + 1
+                st.button("↺ Revenir à la vue d'ensemble", key=f"mapreset_{col}", on_click=_reset)
+        else:
+            st.plotly_chart(fig, use_container_width=True, key=f"map_{col}")
     with c2:
         st.markdown(f"**{title} · évolution mensuelle**")
         st.plotly_chart(evo_chart(s), use_container_width=True, key=f"evo_{col}")
