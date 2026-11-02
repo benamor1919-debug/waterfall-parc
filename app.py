@@ -15,18 +15,22 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
-APP_VERSION = "v8"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+APP_VERSION = "v9"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
 
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
 NUM_COLOR = "#000000"      # couleur des chiffres
 FS_WATERFALL = 24          # chiffres du waterfall
 FS_WATERFALL_DELTA = 28    # grand "Δ" au centre du waterfall
-FS_WATERFALL_AXIS = 18     # libellés sous le waterfall (Parc, GA, React...)
+FS_WATERFALL_AXIS = 20     # libellés sous le waterfall (Parc, GA, React...)
 FS_EVO = 22                # chiffres des graphes d'évolution mensuelle (VUE 360, Base active, Churn, Revenu, ARPU)
-FS_EVO_AXIS = 18           # libellés des mois sous ces graphes
+FS_EVO_AXIS = 22           # libellés des mois sous les graphes d'évolution
 FS_HBAR = 20               # chiffres des classements régions / MoM / YoY
-FS_HBAR_AXIS = 17          # noms des régions
+FS_HBAR_AXIS = 20          # noms des régions (classements, MoM, YoY)
+AXIS_BOLD = True           # True = libellés des axes (mois, régions) en gras
+AXIS_COLOR = "#000000"     # couleur des libellés des axes
+HBAR_PAD_NEG = 0.5         # espace à gauche pour les valeurs négatives (évite le chevauchement avec les noms)
+HBAR_PAD_POS = 0.3         # espace à droite pour les valeurs positives
 FS_MAP_HOVER = 16          # texte de l'infobulle de la carte
 
 # --- Barre latérale (filtres) ---
@@ -210,6 +214,11 @@ def bold(t):
     return f"<b>{t}</b>" if NUM_BOLD else t
 
 
+def lab(t):
+    """Libellé d'axe (mois, région) : en gras si AXIS_BOLD."""
+    return f"<b>{t}</b>" if AXIS_BOLD else str(t)
+
+
 @st.cache_data
 def load():
     return pd.read_csv("data.csv", parse_dates=["date"])
@@ -257,23 +266,28 @@ def show_delta(container, label, cur, ref, col):
 
 def evo_chart(s):
     fig = go.Figure(go.Bar(
-        x=[fm(d) for d in s.index], y=s.values, marker_color=ORANGE,
+        x=[lab(fm(d)) for d in s.index], y=s.values, marker_color=ORANGE,
         text=[bold(human(v)) for v in s.values], textposition="outside",
         textfont=dict(size=FS_EVO, color=NUM_COLOR), outsidetextfont=dict(size=FS_EVO, color=NUM_COLOR),
         cliponaxis=False))
     fig.update_layout(height=360, margin=dict(t=60, b=10, l=10, r=10), yaxis_visible=False, bargap=0.35,
-                      xaxis=dict(tickfont=dict(size=FS_EVO_AXIS), showgrid=False))
+                      xaxis=dict(tickfont=dict(size=FS_EVO_AXIS, color=AXIS_COLOR), showgrid=False))
     return fig
 
 
 def hbar(s, height, colors=None):
     fig = go.Figure(go.Bar(
-        x=s.values, y=s.index, orientation="h", marker_color=colors or ORANGE,
+        x=s.values, y=[lab(n) for n in s.index], orientation="h", marker_color=colors or ORANGE,
         text=[bold(human(v)) for v in s.values], textposition="outside",
         textfont=dict(size=FS_HBAR, color=NUM_COLOR), outsidetextfont=dict(size=FS_HBAR, color=NUM_COLOR),
         cliponaxis=False))
-    fig.update_layout(height=height, margin=dict(t=30, b=10, l=70, r=90), xaxis_visible=False, bargap=0.3,
-                      yaxis=dict(tickfont=dict(size=FS_HBAR_AXIS), automargin=True, showgrid=False))
+    # marge dans l'axe pour que les valeurs (surtout négatives) ne passent pas sous les noms de régions
+    vmin, vmax = float(min(np.nanmin(s.values), 0)), float(max(np.nanmax(s.values), 0))
+    span = (vmax - vmin) or 1.0
+    xr = [vmin - (HBAR_PAD_NEG * span if vmin < 0 else 0), vmax + HBAR_PAD_POS * span]
+    fig.update_layout(height=height, margin=dict(t=30, b=10, l=10, r=20), bargap=0.3,
+                      xaxis=dict(visible=False, range=xr),
+                      yaxis=dict(tickfont=dict(size=FS_HBAR_AXIS, color=AXIS_COLOR), automargin=True, showgrid=False))
     return fig
 
 
@@ -306,17 +320,17 @@ with tabs[1]:
         ga, react, churn = b["ga_30"], b["react_30"], b["churn"]
         autres = end - start - ga - react + churn
         steps = [("GA", ga, "#2ECC71"), ("React", react, "#3498DB"), ("Churn", -churn, "#E74C3C"), ("Autres", autres, "#95A5A6")]
-        xs, bases, heights, colors, texts = [f"Parc<br>{fm(d_from)}"], [0], [start], ["#F4C84B"], [bold(space(start))]
+        xs, bases, heights, colors, texts = [lab(f"Parc<br>{fm(d_from)}")], [0], [start], ["#F4C84B"], [bold(space(start))]
         level = start
         for name, v, color in steps:
             new = level + v
-            xs.append(f"{name}<br>{fm(d_to)}")
+            xs.append(lab(f"{name}<br>{fm(d_to)}"))
             bases.append(min(level, new))
             heights.append(abs(v))
             colors.append(color)
             texts.append(bold(f"{'+' if v >= 0 else '-'}{human(abs(v))}"))
             level = new
-        xs.append(f"Parc<br>{fm(d_to)}")
+        xs.append(lab(f"Parc<br>{fm(d_to)}"))
         bases.append(0); heights.append(end); colors.append("#F4C84B"); texts.append(bold(space(end)))
         fig = go.Figure(go.Bar(x=xs, y=heights, base=bases, marker_color=colors, text=texts,
                                textposition=["inside"] + ["outside"] * 4 + ["inside"],
@@ -328,7 +342,7 @@ with tabs[1]:
         diff = end - start
         fig.update_layout(title=f"Waterfall Parc MoM {fm(d_from)} → {fm(d_to)}" + (f" | {filt}" if filt else ""),
                           height=560, showlegend=False, yaxis_visible=False, margin=dict(t=90, b=20), bargap=0.3, title_font=dict(size=22),
-                          xaxis=dict(tickfont=dict(size=FS_WATERFALL_AXIS), showgrid=False))
+                          xaxis=dict(tickfont=dict(size=FS_WATERFALL_AXIS, color=AXIS_COLOR), showgrid=False))
         fig.add_annotation(x=xs[3], y=start * 0.5, showarrow=False,
                            font=dict(size=FS_WATERFALL_DELTA, color="#27AE60" if diff >= 0 else "#E74C3C"),
                            text=f"<b>Δ {space(diff)} ({diff / start * 100:+.2f}%)</b>")
