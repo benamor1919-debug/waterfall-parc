@@ -62,9 +62,8 @@ COORD = {  # latitude, longitude des gouvernorats
 st.set_page_config(page_title="GeoPulse", page_icon="📡", layout="wide")
 
 # ---- Style (barre latérale + onglets) : tout est piloté par les paramètres ci-dessus ----
+_NOT_TAG = ':not([data-baseweb="tag"]):not([data-baseweb="tag"] *)'
 _CSS = Template("""
-<style>
-/* NB : ne jamais utiliser le caractère supérieur-à dans ce CSS */
 /* ===== Barre latérale ===== */
 [data-testid="stSidebar"] { background-color: ${SB_BG}; }
 [data-testid="stSidebarUserContent"] { padding-left: ${SB_PADDING}px !important; padding-right: ${SB_PADDING}px !important; }
@@ -73,48 +72,63 @@ _CSS = Template("""
 [data-testid="stSidebar"] label p {
     font-size: ${SB_LABEL_SIZE}px !important; font-weight: 800 !important; color: #000 !important;
 }
-[data-testid="stSidebar"] [data-baseweb="select"] div {
-    min-height: ${SB_FIELD_HEIGHT}px; color: #000;
+
+/* Contenu des champs (Choose options, août 2026, ...) */
+[data-testid="stSidebar"] [data-testid="stSelectbox"] *,
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] *,
+[data-testid="stSidebar"] [data-baseweb="select"] *,
+[data-testid="stSidebar"] [role="combobox"],
+[data-testid="stSidebar"] input {
+    font-size: ${SB_VALUE_SIZE}px !important; font-weight: 700 !important;
 }
-[data-testid="stSidebar"] [data-baseweb="select"] {
-    background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 0 0 2px #9AA3AF;
-}
-[data-testid="stSidebar"] [data-baseweb="select"] * { font-size: ${SB_VALUE_SIZE}px !important; font-weight: 700 !important; }
-[data-testid="stSidebar"] [data-baseweb="select"] input::placeholder {
-    color: #374151 !important; opacity: 1; font-size: ${SB_VALUE_SIZE}px !important; font-weight: 700 !important;
-}
+[data-testid="stSidebar"] input::placeholder { color: #374151 !important; opacity: 1 !important; font-weight: 700 !important; font-size: ${SB_VALUE_SIZE}px !important; }
+[data-testid="stSidebar"] [data-testid="stSelectbox"] div${_NOT_TAG},
+[data-testid="stSidebar"] [data-testid="stMultiSelect"] div${_NOT_TAG},
+[data-testid="stSidebar"] [data-baseweb="select"] div${_NOT_TAG} { min-height: ${SB_FIELD_HEIGHT}px; }
+[data-testid="stSidebar"] [data-baseweb="select"],
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] { background-color: #FFFFFF; border-radius: 8px; box-shadow: 0 0 0 2px #9AA3AF; }
+
+/* Valeurs sélectionnées (ex. ARIANA) */
 [data-testid="stSidebar"] [data-baseweb="tag"],
-[data-testid="stSidebar"] [data-baseweb="tag"] * { font-size: ${SB_TAG_SIZE}px !important; font-weight: 700 !important; }
-[data-baseweb="popover"] li, [data-baseweb="popover"] [role="option"], [data-baseweb="menu"] * {
+[data-testid="stSidebar"] [data-baseweb="tag"] * { font-size: ${SB_TAG_SIZE}px !important; font-weight: 700 !important; min-height: 0 !important; }
+
+/* Liste déroulante des options (affichée hors de la barre latérale) */
+[data-baseweb="popover"] li, [data-baseweb="popover"] li *,
+[role="listbox"] *, [role="option"], [role="option"] *,
+[data-testid="stSelectboxVirtualDropdown"] * {
     font-size: ${SB_OPTION_SIZE}px !important; font-weight: 600 !important;
 }
 
 /* ===== Onglets ===== */
-[data-baseweb="tab-list"] { gap: ${TAB_GAP}px; border-bottom: 3px solid ${TAB_ACTIVE_BG}; padding-top: 8px; }
-button[data-baseweb="tab"], [data-testid="stTabs"] button[role="tab"] {
-    height: ${TAB_HEIGHT}px !important; padding: 0 ${TAB_PADDING_X}px !important; background-color: ${TAB_BG};
-    border-radius: 12px 12px 0 0; transition: all 0.2s ease;
+[role="tablist"], [data-baseweb="tab-list"] { gap: ${TAB_GAP}px !important; border-bottom: 3px solid ${TAB_ACTIVE_BG} !important; padding-top: 8px; }
+button[role="tab"], button[data-baseweb="tab"], button[data-testid="stTab"] {
+    height: ${TAB_HEIGHT}px !important; padding: 0 ${TAB_PADDING_X}px !important; background-color: ${TAB_BG} !important;
+    border-radius: 12px 12px 0 0 !important; transition: all 0.2s ease;
 }
-button[data-baseweb="tab"] p, button[data-baseweb="tab"] div, button[data-baseweb="tab"] span,
-[data-testid="stTabs"] button[role="tab"] p, [data-testid="stTabs"] button[role="tab"] span {
+button[role="tab"], button[role="tab"] *, button[data-baseweb="tab"] *, button[data-testid="stTab"] * {
     font-size: ${TAB_FONT_SIZE}px !important; font-weight: 800 !important; color: ${TAB_TEXT} !important;
 }
-button[data-baseweb="tab"]:hover { background-color: #FDE5D8; }
-button[data-baseweb="tab"]:hover p { color: ${TAB_ACTIVE_BG} !important; }
-button[data-baseweb="tab"][aria-selected="true"],
-[data-testid="stTabs"] button[role="tab"][aria-selected="true"] { background-color: ${TAB_ACTIVE_BG}; }
-button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] div,
-button[data-baseweb="tab"][aria-selected="true"] span,
-[data-testid="stTabs"] button[role="tab"][aria-selected="true"] p { color: ${TAB_ACTIVE_TEXT} !important; }
+button[role="tab"]:hover { background-color: #FDE5D8 !important; }
+button[role="tab"][aria-selected="true"] { background-color: ${TAB_ACTIVE_BG} !important; }
+button[role="tab"][aria-selected="true"], button[role="tab"][aria-selected="true"] * { color: ${TAB_ACTIVE_TEXT} !important; }
 [data-baseweb="tab-highlight"] { background-color: #000000 !important; height: 4px !important; }
 [data-baseweb="tab-border"] { background-color: transparent !important; }
-</style>
 """)
 _css_txt = _CSS.safe_substitute(globals())
-if hasattr(st, "html"):
-    st.html(_css_txt)  # injection directe du CSS (plus fiable que st.markdown)
-else:
-    st.markdown(_css_txt, unsafe_allow_html=True)
+
+# Injection 1 : balise <style> classique
+st.markdown(f"<style>{_css_txt}</style>", unsafe_allow_html=True)
+
+# Injection 2 : via JavaScript directement dans la page (contourne les filtres de Streamlit)
+import json
+import streamlit.components.v1 as components
+components.html(
+    "<script>(function(){var css=" + json.dumps(_css_txt) + ";"
+    "var d=window.parent.document;var e=d.getElementById('geopulse-style');"
+    "if(!e){e=d.createElement('style');e.id='geopulse-style';d.head.appendChild(e);}"
+    "e.textContent=css;})();</script>",
+    height=0,
+)
 
 
 def img_b64(path):
