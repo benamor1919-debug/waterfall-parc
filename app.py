@@ -15,6 +15,8 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
+APP_VERSION = "v6"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
 NUM_COLOR = "#000000"      # couleur des chiffres
@@ -191,6 +193,7 @@ with st.sidebar:
                        ("ligne_produit", "Ligne de produit"), ("type_offre", "Type d'offre")]:
         sel[col] = st.multiselect(label, sorted(df[col].unique()))
     mois_sel = st.selectbox("Mois des KPI et de la carte", dates, index=len(dates) - 1, format_func=fm)
+    st.caption(f"Version du code : {APP_VERSION}")
 
 f = df
 for col, vals in sel.items():
@@ -243,7 +246,7 @@ def hbar(s, height, colors=None):
 
 TITRES = {"base_actif": "Base active", "churn": "Churn", "rev_actif": "Revenu actif", "arpu": "ARPU"}
 
-tabs = st.tabs(["VUE 360", "Waterfall", "Base active", "Churn", "Revenu actif", "ARPU"])
+tabs = st.tabs(["**VUE 360**", "**Waterfall**", "**Base active**", "**Churn**", "**Revenu actif**", "**ARPU**"])
 
 # ---------------- VUE 360 ----------------
 with tabs[0]:
