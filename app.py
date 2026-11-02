@@ -15,7 +15,7 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
-APP_VERSION = "v9"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+APP_VERSION = "v10"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
 
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
@@ -25,7 +25,8 @@ FS_WATERFALL_DELTA = 28    # grand "Δ" au centre du waterfall
 FS_WATERFALL_AXIS = 20     # libellés sous le waterfall (Parc, GA, React...)
 FS_EVO = 22                # chiffres des graphes d'évolution mensuelle (VUE 360, Base active, Churn, Revenu, ARPU)
 FS_EVO_AXIS = 22           # libellés des mois sous les graphes d'évolution
-FS_HBAR = 20               # chiffres des classements régions / MoM / YoY
+FS_HBAR = 26               # chiffres au bout des barres (classements régions / MoM / YoY)
+HBAR_ROW_HEIGHT = 40       # hauteur d'une ligne (px) : augmente si les chiffres sont serrés
 FS_HBAR_AXIS = 20          # noms des régions (classements, MoM, YoY)
 AXIS_BOLD = True           # True = libellés des axes (mois, régions) en gras
 AXIS_COLOR = "#000000"     # couleur des libellés des axes
@@ -269,7 +270,7 @@ def evo_chart(s):
         x=[lab(fm(d)) for d in s.index], y=s.values, marker_color=ORANGE,
         text=[bold(human(v)) for v in s.values], textposition="outside",
         textfont=dict(size=FS_EVO, color=NUM_COLOR), outsidetextfont=dict(size=FS_EVO, color=NUM_COLOR),
-        cliponaxis=False))
+        cliponaxis=False, constraintext="none"))
     fig.update_layout(height=360, margin=dict(t=60, b=10, l=10, r=10), yaxis_visible=False, bargap=0.35,
                       xaxis=dict(tickfont=dict(size=FS_EVO_AXIS, color=AXIS_COLOR), showgrid=False))
     return fig
@@ -280,12 +281,12 @@ def hbar(s, height, colors=None):
         x=s.values, y=[lab(n) for n in s.index], orientation="h", marker_color=colors or ORANGE,
         text=[bold(human(v)) for v in s.values], textposition="outside",
         textfont=dict(size=FS_HBAR, color=NUM_COLOR), outsidetextfont=dict(size=FS_HBAR, color=NUM_COLOR),
-        cliponaxis=False))
+        cliponaxis=False, constraintext="none"))
     # marge dans l'axe pour que les valeurs (surtout négatives) ne passent pas sous les noms de régions
     vmin, vmax = float(min(np.nanmin(s.values), 0)), float(max(np.nanmax(s.values), 0))
     span = (vmax - vmin) or 1.0
     xr = [vmin - (HBAR_PAD_NEG * span if vmin < 0 else 0), vmax + HBAR_PAD_POS * span]
-    fig.update_layout(height=height, margin=dict(t=30, b=10, l=10, r=20), bargap=0.3,
+    fig.update_layout(height=max(height, HBAR_ROW_HEIGHT * len(s) + 50), margin=dict(t=30, b=10, l=10, r=20), bargap=0.25,
                       xaxis=dict(visible=False, range=xr),
                       yaxis=dict(tickfont=dict(size=FS_HBAR_AXIS, color=AXIS_COLOR), automargin=True, showgrid=False))
     return fig
@@ -337,7 +338,7 @@ with tabs[1]:
                                textfont=dict(size=FS_WATERFALL, color=NUM_COLOR),
                                insidetextfont=dict(size=FS_WATERFALL + 2, color=NUM_COLOR),
                                outsidetextfont=dict(size=FS_WATERFALL, color=NUM_COLOR),
-                               cliponaxis=False))
+                               cliponaxis=False, constraintext="none"))
         filt = " - ".join(" + ".join(v) for v in sel.values() if v)
         diff = end - start
         fig.update_layout(title=f"Waterfall Parc MoM {fm(d_from)} → {fm(d_to)}" + (f" | {filt}" if filt else ""),
