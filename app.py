@@ -15,7 +15,7 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
-APP_VERSION = "v10"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+APP_VERSION = "v11"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
 
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
@@ -53,6 +53,18 @@ TAB_BG = "#F3F4F6"         # fond des onglets
 TAB_TEXT = "#374151"       # texte des onglets
 TAB_ACTIVE_BG = ORANGE     # fond de l'onglet actif
 TAB_ACTIVE_TEXT = "#FFFFFF"  # texte de l'onglet actif
+
+# --- Carte de Tunisie ---
+MAP_STYLE = "carto-positron"   # fond de carte épuré ("open-street-map" = plus détaillé)
+MAP_HEIGHT = 650               # hauteur de la carte (px)
+MAP_TEXT_SIZE = 16             # taille des chiffres sur la carte (vue d'ensemble)
+MAP_TEXT_SIZE_ZOOM = 24        # taille des chiffres quand des gouvernorats sont sélectionnés
+MAP_BUBBLE_MAX = 55            # taille max des bulles (px)
+MAP_COLOR_LOW = "#FDBA74"      # couleur des petites valeurs
+MAP_COLOR_HIGH = "#C2410C"     # couleur des grandes valeurs
+MAP_ZOOM_DEFAULT = 5.5         # zoom sans sélection
+MAP_ZOOM_MAX = 10              # zoom maximum quand on sélectionne un gouvernorat
+MAP_PAD_DEG = 1.0              # marge autour de la sélection (en degrés) : augmente pour dézoomer
 
 # --- Look général de la page ---
 PAGE_BG = "#F1F3F6"        # fond de la page
@@ -360,6 +372,18 @@ with tabs[1]:
         st.markdown(f"[{fm(d_to)}] " + "  ·  ".join(parts))
 
 
+def map_view(names):
+    """Centre et zoom de la carte : s'adapte aux gouvernorats sélectionnés."""
+    pts = [COORD[n] for n in names if n in COORD]
+    if not pts:
+        return {"lat": 33.9, "lon": 9.5}, MAP_ZOOM_DEFAULT
+    lats, lons = [p[0] for p in pts], [p[1] for p in pts]
+    center = {"lat": (min(lats) + max(lats)) / 2, "lon": (min(lons) + max(lons)) / 2}
+    span = max(max(lons) - min(lons), (max(lats) - min(lats)) * 1.3) + MAP_PAD_DEG
+    zoom = float(np.clip(np.log2(560 / span), MAP_ZOOM_DEFAULT, MAP_ZOOM_MAX))
+    return center, zoom
+
+
 # ---------------- Pages détail : Base active / Churn / Revenu actif / ARPU ----------------
 def detail(col):
     title = TITRES[col]
@@ -389,12 +413,21 @@ def detail(col):
         mp = mp.rename_axis("gouvernorat").reset_index()
         mp["taille"] = mp["valeur"].clip(lower=0).fillna(0) + 1e-9
         mp["valeur_txt"] = mp["valeur"].map(human)
-        fig = px.scatter_map(mp, lat="lat", lon="lon", size="taille", hover_name="gouvernorat",
-                             hover_data={"valeur_txt": True, "lat": False, "lon": False, "taille": False},
-                             size_max=35, zoom=5.5, center={"lat": 33.9, "lon": 9.5},
-                             map_style="open-street-map", height=600, color_discrete_sequence=["#1E90FF"])
-        fig.update_traces(marker=dict(opacity=0.7))
-        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), hoverlabel=dict(font_size=FS_MAP_HOVER))
+        chosen = [g for g in sel.get("gouvernorat", []) if g in set(mp["gouvernorat"])]
+        zoomed = len(chosen) > 0
+        center, zoom = map_view(chosen)
+        # étiquette : nom + chiffre quand on a sélectionné, sinon le chiffre seul
+        mp["etiquette"] = (mp["gouvernorat"] + " : " + mp["valeur_txt"]) if zoomed else mp["valeur_txt"]
+        fig = px.scatter_map(mp, lat="lat", lon="lon", size="taille", color="valeur", text="etiquette",
+                             hover_name="gouvernorat",
+                             hover_data={"valeur_txt": True, "lat": False, "lon": False, "taille": False, "valeur": False},
+                             size_max=MAP_BUBBLE_MAX, zoom=zoom, center=center,
+                             map_style=MAP_STYLE, height=MAP_HEIGHT,
+                             color_continuous_scale=[[0, MAP_COLOR_LOW], [1, MAP_COLOR_HIGH]])
+        fig.update_traces(mode="markers+text", marker=dict(opacity=0.8), textposition="top center",
+                          textfont=dict(size=MAP_TEXT_SIZE_ZOOM if zoomed else MAP_TEXT_SIZE, color="#000000"))
+        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), hoverlabel=dict(font_size=FS_MAP_HOVER),
+                          coloraxis_showscale=False)
         st.plotly_chart(fig, use_container_width=True, key=f"map_{col}")
     with c2:
         st.markdown(f"**{title} · évolution mensuelle**")
