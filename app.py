@@ -10,6 +10,13 @@ import streamlit as st
 ORANGE = "#E8703A"
 MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
 VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
+
+# ---- Tailles de police des chiffres (modifie ici pour tout changer d'un coup) ----
+FS_WATERFALL = 22   # chiffres du waterfall
+FS_EVO = 18         # chiffres des graphes d'évolution mensuelle
+FS_HBAR = 16        # chiffres des classements / MoM / YoY
+FS_AXIS = 15        # libellés des axes (mois, régions)
+
 COORD = {  # latitude, longitude des gouvernorats
     "ARIANA": (36.8665, 10.1647), "BEJA": (36.7256, 9.1817), "BEN AROUS": (36.7531, 10.2189),
     "BIZERTE": (37.2744, 9.8739), "GABES": (33.8815, 10.0982), "GAFSA": (34.4250, 8.7842),
@@ -62,6 +69,10 @@ def space(x):
     return f"{x:,.0f}".replace(",", " ")
 
 
+def bold(t):
+    return f"<b>{t}</b>"
+
+
 @st.cache_data
 def load():
     return pd.read_csv("data.csv", parse_dates=["date"])
@@ -107,16 +118,24 @@ def show_delta(container, label, cur, ref, col):
 
 
 def evo_chart(s):
-    fig = go.Figure(go.Bar(x=[fm(d) for d in s.index], y=s.values, marker_color=ORANGE,
-                           text=[human(v) for v in s.values], textposition="outside"))
-    fig.update_layout(height=300, margin=dict(t=30, b=10, l=10, r=10), yaxis_visible=False)
+    fig = go.Figure(go.Bar(
+        x=[fm(d) for d in s.index], y=s.values, marker_color=ORANGE,
+        text=[bold(human(v)) for v in s.values], textposition="outside",
+        textfont=dict(size=FS_EVO, color="#000000"), outsidetextfont=dict(size=FS_EVO, color="#000000"),
+        cliponaxis=False))
+    fig.update_layout(height=340, margin=dict(t=50, b=10, l=10, r=10), yaxis_visible=False,
+                      xaxis=dict(tickfont=dict(size=FS_AXIS)))
     return fig
 
 
 def hbar(s, height, colors=None):
-    fig = go.Figure(go.Bar(x=s.values, y=s.index, orientation="h", marker_color=colors or ORANGE,
-                           text=[human(v) for v in s.values], textposition="outside"))
-    fig.update_layout(height=height, margin=dict(t=30, b=10, l=10, r=40), xaxis_visible=False)
+    fig = go.Figure(go.Bar(
+        x=s.values, y=s.index, orientation="h", marker_color=colors or ORANGE,
+        text=[bold(human(v)) for v in s.values], textposition="outside",
+        textfont=dict(size=FS_HBAR, color="#000000"), outsidetextfont=dict(size=FS_HBAR, color="#000000"),
+        cliponaxis=False))
+    fig.update_layout(height=height, margin=dict(t=30, b=10, l=70, r=80), xaxis_visible=False,
+                      yaxis=dict(tickfont=dict(size=FS_AXIS)))
     return fig
 
 
@@ -149,7 +168,7 @@ with tabs[1]:
         ga, react, churn = b["ga_30"], b["react_30"], b["churn"]
         autres = end - start - ga - react + churn
         steps = [("GA", ga, "#2ECC71"), ("React", react, "#3498DB"), ("Churn", -churn, "#E74C3C"), ("Autres", autres, "#95A5A6")]
-        xs, bases, heights, colors, texts = [f"Parc<br>{fm(d_from)}"], [0], [start], ["#F4C84B"], [space(start)]
+        xs, bases, heights, colors, texts = [f"Parc<br>{fm(d_from)}"], [0], [start], ["#F4C84B"], [bold(space(start))]
         level = start
         for name, v, color in steps:
             new = level + v
@@ -157,17 +176,22 @@ with tabs[1]:
             bases.append(min(level, new))
             heights.append(abs(v))
             colors.append(color)
-            texts.append(f"{'+' if v >= 0 else '-'}{human(abs(v))}")
+            texts.append(bold(f"{'+' if v >= 0 else '-'}{human(abs(v))}"))
             level = new
         xs.append(f"Parc<br>{fm(d_to)}")
-        bases.append(0); heights.append(end); colors.append("#F4C84B"); texts.append(space(end))
+        bases.append(0); heights.append(end); colors.append("#F4C84B"); texts.append(bold(space(end)))
         fig = go.Figure(go.Bar(x=xs, y=heights, base=bases, marker_color=colors, text=texts,
-                               textposition=["inside"] + ["outside"] * 4 + ["inside"]))
+                               textposition=["inside"] + ["outside"] * 4 + ["inside"],
+                               textfont=dict(size=FS_WATERFALL, color="#000000"),
+                               insidetextfont=dict(size=FS_WATERFALL + 2, color="#000000"),
+                               outsidetextfont=dict(size=FS_WATERFALL, color="#000000"),
+                               cliponaxis=False))
         filt = " - ".join(" + ".join(v) for v in sel.values() if v)
         diff = end - start
         fig.update_layout(title=f"Waterfall Parc MoM {fm(d_from)} → {fm(d_to)}" + (f" | {filt}" if filt else ""),
-                          height=520, showlegend=False, yaxis_visible=False, margin=dict(t=60, b=20))
-        fig.add_annotation(x=xs[3], y=start * 0.5, showarrow=False, font=dict(size=18, color="#27AE60" if diff >= 0 else "#E74C3C"),
+                          height=560, showlegend=False, yaxis_visible=False, margin=dict(t=90, b=20),
+                          xaxis=dict(tickfont=dict(size=FS_AXIS + 1)))
+        fig.add_annotation(x=xs[3], y=start * 0.5, showarrow=False, font=dict(size=26, color="#27AE60" if diff >= 0 else "#E74C3C"),
                            text=f"<b>Δ {space(diff)} ({diff / start * 100:+.2f}%)</b>")
         st.plotly_chart(fig, use_container_width=True, key="waterfall")
 
@@ -216,7 +240,7 @@ def detail(col):
                              size_max=35, zoom=5.5, center={"lat": 33.9, "lon": 9.5},
                              map_style="open-street-map", height=600, color_discrete_sequence=["#1E90FF"])
         fig.update_traces(marker=dict(opacity=0.7))
-        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), hoverlabel=dict(font_size=16))
         st.plotly_chart(fig, use_container_width=True, key=f"map_{col}")
     with c2:
         st.markdown(f"**{title} · évolution mensuelle**")
@@ -227,11 +251,11 @@ def detail(col):
     with d1:
         st.markdown(f"**Classement des régions · {title}**")
         rk = r.dropna().sort_values()
-        st.plotly_chart(hbar(rk, 640), use_container_width=True, key=f"rank_{col}")
+        st.plotly_chart(hbar(rk, 700), use_container_width=True, key=f"rank_{col}")
     with d2:
         st.markdown(f"**Régions · MoM** ({fm(prev_d)} → {fm(mois_sel)})")
         mom = (r - rp).dropna().sort_values()
-        st.plotly_chart(hbar(mom, 640, [good if v >= 0 else bad for v in mom.values]),
+        st.plotly_chart(hbar(mom, 700, [good if v >= 0 else bad for v in mom.values]),
                         use_container_width=True, key=f"mom_{col}")
     with d3:
         st.markdown(f"**Régions · YoY** ({fm(yago_d)} → {fm(mois_sel)})")
@@ -239,7 +263,7 @@ def detail(col):
         if yoy.empty:
             st.info("Pas de données pour le même mois de l'année précédente.")
         else:
-            st.plotly_chart(hbar(yoy, 640, [good if v >= 0 else bad for v in yoy.values]),
+            st.plotly_chart(hbar(yoy, 700, [good if v >= 0 else bad for v in yoy.values]),
                             use_container_width=True, key=f"yoy_{col}")
 
 
