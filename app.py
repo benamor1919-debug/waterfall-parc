@@ -15,7 +15,7 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
-APP_VERSION = "v13"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+APP_VERSION = "v14"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
 
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
@@ -107,6 +107,11 @@ _CSS = Template("""
 [data-testid="stMain"] [data-testid="stMarkdownContainer"] strong { font-size: ${CHART_TITLE_SIZE}px; color: #111; }
 [data-testid="stMain"] [data-testid="stWidgetLabel"] p { font-size: 18px !important; font-weight: 700 !important; color: #111 !important; }
 [data-testid="stMain"] [data-baseweb="select"] * { font-size: 18px !important; font-weight: 700 !important; }
+
+.geo-chip {
+    background: #FFF1E6; border-left: 7px solid ${ORANGE}; border-radius: 12px; padding: 14px 18px;
+    font-size: 20px; font-weight: 700; color: #111; box-shadow: ${CARD_SHADOW};
+}
 
 /* ===== Cartes : graphiques et indicateurs ===== */
 [data-testid="stPlotlyChart"] {
@@ -260,13 +265,30 @@ if f.empty:
     st.stop()
 
 
+# ---------------- Filtre croisé par clic sur la carte (comme Power BI) ----------------
+def reset_geo():
+    """Efface le gouvernorat cliqué sur la carte et réinitialise la sélection des cartes."""
+    st.session_state.pop("geo_click", None)
+    st.session_state.pop("geo_handled", None)
+    st.session_state["mapver"] = st.session_state.get("mapver", 0) + 1
+
+
+geo = st.session_state.get("geo_click")
+if geo is not None and geo not in set(f["gouvernorat"]):
+    geo = None
+    st.session_state.pop("geo_click", None)
+# f      = données filtrées par la barre latérale (utilisées pour la carte et les classements par région)
+# f_geo  = f + gouvernorat cliqué sur la carte (utilisé pour les KPI, évolutions et waterfall)
+f_geo = f[f["gouvernorat"] == geo] if geo else f
+
+
 def agg(d, by):
     g = d.groupby(by)[VALS].sum()
     g["arpu"] = g["rev_actif"] / g["base_actif"].where(g["base_actif"] > 0)
     return g
 
 
-m = agg(f, "date").sort_index()
+m = agg(f_geo, "date").sort_index()
 prev_d = mois_sel - pd.DateOffset(months=1)
 yago_d = mois_sel - pd.DateOffset(years=1)
 
@@ -289,9 +311,10 @@ def evo_chart(s):
     return fig
 
 
-def hbar(s, height, colors=None):
+def hbar(s, height, colors=None, highlight=None):
     fig = go.Figure(go.Bar(
-        x=s.values, y=[lab(n) for n in s.index], orientation="h", marker_color=colors or ORANGE,
+        x=s.values, y=[lab(n) for n in s.index], orientation="h",
+        marker=dict(color=colors or ORANGE, opacity=[1.0 if n == highlight else 0.3 for n in s.index] if highlight else 1.0),
         text=[bold(human(v)) for v in s.values], textposition="outside",
         textfont=dict(size=FS_HBAR, color=NUM_COLOR), outsidetextfont=dict(size=FS_HBAR, color=NUM_COLOR),
         cliponaxis=False, constraintext="none"))
@@ -306,6 +329,12 @@ def hbar(s, height, colors=None):
 
 
 TITRES = {"base_actif": "Base active", "churn": "Churn", "rev_actif": "Revenu actif", "arpu": "ARPU"}
+
+if geo:
+    _c1, _c2 = st.columns([4, 1])
+    _c1.markdown(f"<div class='geo-chip'>🎯 Filtre carte actif : <b>{geo}</b> &nbsp;·&nbsp; tous les indicateurs et graphiques sont filtrés</div>",
+                 unsafe_allow_html=True)
+    _c2.button("✕ Effacer le filtre carte", key="geo_clear", on_click=reset_geo)
 
 tabs = st.tabs(["**VUE 360**", "**Waterfall**", "**Base active**", "**Churn**", "**Revenu actif**", "**ARPU**"])
 
@@ -353,6 +382,8 @@ with tabs[1]:
                                outsidetextfont=dict(size=FS_WATERFALL, color=NUM_COLOR),
                                cliponaxis=False, constraintext="none"))
         filt = " - ".join(" + ".join(v) for v in sel.values() if v)
+        if geo:
+            filt = (filt + " - " if filt else "") + geo
         diff = end - start
         fig.update_layout(title=f"Waterfall Parc MoM {fm(d_from)} → {fm(d_to)}" + (f" | {filt}" if filt else ""),
                           height=560, showlegend=False, yaxis_visible=False, margin=dict(t=90, b=20), bargap=0.3, title_font=dict(size=22),
@@ -415,12 +446,8 @@ def detail(col):
         mp["taille"] = mp["valeur"].clip(lower=0).fillna(0) + 1e-9
         mp["valeur_txt"] = mp["valeur"].map(human)
         names = set(mp["gouvernorat"])
-
-        # --- zoom : filtre "Localisation" en priorité, sinon gouvernorat cliqué sur la carte ---
-        skey, hkey, vkey = f"mapclick_{col}", f"maphandled_{col}", f"mapver_{col}"
         chosen = [g for g in sel.get("gouvernorat", []) if g in names]
-        clicked = st.session_state.get(skey)
-        focus = chosen if chosen else ([clicked] if clicked in names else [])
+        focus = [geo] if geo in names else chosen       # le clic sur la carte est prioritaire sur le filtre
         zoomed = len(focus) > 0
         center, zoom = map_view(focus)
         mp["etiquette"] = (mp["gouvernorat"] + " : " + mp["valeur_txt"]) if zoomed else mp["valeur_txt"]
@@ -430,35 +457,31 @@ def detail(col):
                              size_max=MAP_BUBBLE_MAX, zoom=zoom, center=center, height=MAP_HEIGHT,
                              map_style=MAP_STYLE,
                              color_continuous_scale=[[0, MAP_COLOR_LOW], [1, MAP_COLOR_HIGH]])
-        fig.update_traces(mode="markers+text", marker=dict(opacity=0.8), textposition="top center",
+        # le gouvernorat cliqué reste net, les autres sont estompés
+        opacity = [1.0 if g == geo else 0.3 for g in mp["gouvernorat"]] if geo in names else 0.8
+        fig.update_traces(mode="markers+text", marker=dict(opacity=opacity), textposition="top center",
                           textfont=dict(size=MAP_TEXT_SIZE_ZOOM if zoomed else MAP_TEXT_SIZE, color="#000000"),
                           hovertemplate="<b>%{hovertext}</b><br>" + title + " : <b>%{customdata[0]}</b><extra></extra>")
         fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), hoverlabel=dict(font_size=FS_MAP_HOVER),
                           coloraxis_showscale=False)
 
         if MAP_CLICK_ZOOM:
-            ver = st.session_state.get(vkey, 0)
+            ver = st.session_state.get("mapver", 0)
             try:
                 ev = st.plotly_chart(fig, use_container_width=True, key=f"map_{col}_{ver}",
                                      on_select="rerun", selection_mode="points")
                 pts = ev["selection"]["points"]
-            except Exception:  # ancienne version de Streamlit : pas de clic, on affiche simplement la carte
+            except Exception:  # ancienne version de Streamlit : pas de clic
                 st.plotly_chart(fig, use_container_width=True, key=f"map_{col}_{ver}")
                 pts = []
             if pts:
                 idx = pts[0].get("point_index", pts[0].get("point_number"))
                 if idx is not None and 0 <= idx < len(mp):
                     name = mp.iloc[idx]["gouvernorat"]
-                    if st.session_state.get(hkey) != name:
-                        st.session_state[hkey] = name
-                        st.session_state[skey] = name
+                    if st.session_state.get("geo_handled") != name:
+                        st.session_state["geo_handled"] = name
+                        st.session_state["geo_click"] = name
                         st.rerun()
-            if clicked and not chosen:
-                def _reset():
-                    st.session_state.pop(skey, None)
-                    st.session_state.pop(hkey, None)
-                    st.session_state[vkey] = st.session_state.get(vkey, 0) + 1
-                st.button("↺ Revenir à la vue d'ensemble", key=f"mapreset_{col}", on_click=_reset)
         else:
             st.plotly_chart(fig, use_container_width=True, key=f"map_{col}")
     with c2:
@@ -470,11 +493,11 @@ def detail(col):
     with d1:
         st.markdown(f"**Classement des régions · {title}**")
         rk = r.dropna().sort_values()
-        st.plotly_chart(hbar(rk, 720), use_container_width=True, key=f"rank_{col}")
+        st.plotly_chart(hbar(rk, 720, highlight=geo), use_container_width=True, key=f"rank_{col}")
     with d2:
         st.markdown(f"**Régions · MoM** ({fm(prev_d)} → {fm(mois_sel)})")
         mom = (r - rp).dropna().sort_values()
-        st.plotly_chart(hbar(mom, 720, [good if v >= 0 else bad for v in mom.values]),
+        st.plotly_chart(hbar(mom, 720, [good if v >= 0 else bad for v in mom.values], highlight=geo),
                         use_container_width=True, key=f"mom_{col}")
     with d3:
         st.markdown(f"**Régions · YoY** ({fm(yago_d)} → {fm(mois_sel)})")
@@ -482,7 +505,7 @@ def detail(col):
         if yoy.empty:
             st.info("Pas de données pour le même mois de l'année précédente.")
         else:
-            st.plotly_chart(hbar(yoy, 720, [good if v >= 0 else bad for v in yoy.values]),
+            st.plotly_chart(hbar(yoy, 720, [good if v >= 0 else bad for v in yoy.values], highlight=geo),
                             use_container_width=True, key=f"yoy_{col}")
 
 
