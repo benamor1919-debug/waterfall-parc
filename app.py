@@ -15,7 +15,7 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
-APP_VERSION = "v12"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+APP_VERSION = "v13"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
 
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
@@ -55,7 +55,7 @@ TAB_ACTIVE_BG = ORANGE     # fond de l'onglet actif
 TAB_ACTIVE_TEXT = "#FFFFFF"  # texte de l'onglet actif
 
 # --- Carte de Tunisie ---
-MAP_TILES = "light_nolabels"   # fond de carte sans noms (propre) : "light_nolabels", "light_all", "voyager_nolabels", "dark_nolabels"
+MAP_STYLE = "open-street-map"   # fond de carte gratuit sans clé : "open-street-map" (conseillé) ou "carto-positron" (plus épuré)
 MAP_CLICK_ZOOM = True          # True = un clic sur une bulle zoome sur ce gouvernorat
 MAP_HEIGHT = 650               # hauteur de la carte (px)
 MAP_TEXT_SIZE = 16             # taille des chiffres sur la carte (vue d'ensemble)
@@ -428,15 +428,13 @@ def detail(col):
         fig = px.scatter_map(mp, lat="lat", lon="lon", size="taille", color="valeur", text="etiquette",
                              hover_name="gouvernorat", custom_data=["valeur_txt"],
                              size_max=MAP_BUBBLE_MAX, zoom=zoom, center=center, height=MAP_HEIGHT,
-                             map_style="white-bg",
+                             map_style=MAP_STYLE,
                              color_continuous_scale=[[0, MAP_COLOR_LOW], [1, MAP_COLOR_HIGH]])
         fig.update_traces(mode="markers+text", marker=dict(opacity=0.8), textposition="top center",
                           textfont=dict(size=MAP_TEXT_SIZE_ZOOM if zoomed else MAP_TEXT_SIZE, color="#000000"),
                           hovertemplate="<b>%{hovertext}</b><br>" + title + " : <b>%{customdata[0]}</b><extra></extra>")
-        fig.update_layout(
-            margin=dict(t=0, b=0, l=0, r=0), hoverlabel=dict(font_size=FS_MAP_HOVER), coloraxis_showscale=False,
-            map_layers=[dict(below="traces", sourcetype="raster", sourceattribution="© OpenStreetMap © CARTO",
-                             source=[f"https://a.basemaps.cartocdn.com/{MAP_TILES}/{{z}}/{{x}}/{{y}}.png"])])
+        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), hoverlabel=dict(font_size=FS_MAP_HOVER),
+                          coloraxis_showscale=False)
 
         if MAP_CLICK_ZOOM:
             ver = st.session_state.get(vkey, 0)
