@@ -1,5 +1,6 @@
 import base64
 import os
+from string import Template
 
 import numpy as np
 import pandas as pd
@@ -11,11 +12,41 @@ ORANGE = "#E8703A"
 MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
 VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 
-# ---- Tailles de police des chiffres (modifie ici pour tout changer d'un coup) ----
-FS_WATERFALL = 22   # chiffres du waterfall
-FS_EVO = 18         # chiffres des graphes d'évolution mensuelle
-FS_HBAR = 16        # chiffres des classements / MoM / YoY
-FS_AXIS = 15        # libellés des axes (mois, régions)
+# =====================================================================
+#                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
+# =====================================================================
+# --- Chiffres des graphiques (taille en px) ---
+NUM_BOLD = True            # True = chiffres en gras, False = normal
+NUM_COLOR = "#000000"      # couleur des chiffres
+FS_WATERFALL = 24          # chiffres du waterfall
+FS_WATERFALL_DELTA = 28    # grand "Δ" au centre du waterfall
+FS_WATERFALL_AXIS = 18     # libellés sous le waterfall (Parc, GA, React...)
+FS_EVO = 22                # chiffres des graphes d'évolution mensuelle (VUE 360, Base active, Churn, Revenu, ARPU)
+FS_EVO_AXIS = 18           # libellés des mois sous ces graphes
+FS_HBAR = 20               # chiffres des classements régions / MoM / YoY
+FS_HBAR_AXIS = 17          # noms des régions
+FS_MAP_HOVER = 16          # texte de l'infobulle de la carte
+
+# --- Barre latérale (filtres) ---
+SB_BG = "#E4E7EC"          # couleur de fond de la barre
+SB_PADDING = 24            # marge gauche/droite (px)
+SB_TITLE_SIZE = 36         # titre "Filtres"
+SB_LABEL_SIZE = 22         # Localisation, Programme, Ligne de produit...
+SB_VALUE_SIZE = 20         # contenu des champs (Choose options, août 2026...)
+SB_TAG_SIZE = 18           # valeurs sélectionnées (ex. ARIANA)
+SB_OPTION_SIZE = 20        # liste déroulante des options
+SB_FIELD_HEIGHT = 60       # hauteur des champs
+
+# --- Onglets (VUE 360, Waterfall, Base active...) ---
+TAB_FONT_SIZE = 24         # taille du texte
+TAB_HEIGHT = 66            # hauteur
+TAB_PADDING_X = 34         # espace horizontal dans chaque onglet
+TAB_GAP = 12               # espace entre les onglets
+TAB_BG = "#F3F4F6"         # fond des onglets
+TAB_TEXT = "#374151"       # texte des onglets
+TAB_ACTIVE_BG = ORANGE     # fond de l'onglet actif
+TAB_ACTIVE_TEXT = "#FFFFFF"  # texte de l'onglet actif
+# =====================================================================
 
 COORD = {  # latitude, longitude des gouvernorats
     "ARIANA": (36.8665, 10.1647), "BEJA": (36.7256, 9.1817), "BEN AROUS": (36.7531, 10.2189),
@@ -30,62 +61,52 @@ COORD = {  # latitude, longitude des gouvernorats
 
 st.set_page_config(page_title="GeoPulse", page_icon="📡", layout="wide")
 
-# ---- Style de la barre latérale (filtres) : plus grande, en gras, plus lisible ----
-st.markdown(
-    """
-    <style>
-    /* Largeur et fond de la barre */
-    [data-testid="stSidebar"][aria-expanded="true"] { min-width: 360px; width: 360px; }
-    [data-testid="stSidebar"] { background-color: #E4E7EC; }
+# ---- Style (barre latérale + onglets) : tout est piloté par les paramètres ci-dessus ----
+_CSS = Template("""
+<style>
+/* ===== Barre latérale ===== */
+[data-testid="stSidebar"] { background-color: ${SB_BG}; }
+[data-testid="stSidebarUserContent"] { padding-left: ${SB_PADDING}px !important; padding-right: ${SB_PADDING}px !important; }
+[data-testid="stSidebar"] h2 { font-size: ${SB_TITLE_SIZE}px !important; font-weight: 800 !important; color: #000 !important; }
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+[data-testid="stSidebar"] label p {
+    font-size: ${SB_LABEL_SIZE}px !important; font-weight: 800 !important; color: #000 !important;
+}
+[data-testid="stSidebar"] [data-baseweb="select"] > div {
+    min-height: ${SB_FIELD_HEIGHT}px; background-color: #FFFFFF; border: 2px solid #9AA3AF; color: #000;
+}
+[data-testid="stSidebar"] [data-baseweb="select"] * { font-size: ${SB_VALUE_SIZE}px !important; font-weight: 700 !important; }
+[data-testid="stSidebar"] [data-baseweb="select"] input::placeholder {
+    color: #374151 !important; opacity: 1; font-size: ${SB_VALUE_SIZE}px !important; font-weight: 700 !important;
+}
+[data-testid="stSidebar"] [data-baseweb="tag"],
+[data-testid="stSidebar"] [data-baseweb="tag"] * { font-size: ${SB_TAG_SIZE}px !important; font-weight: 700 !important; }
+[data-baseweb="popover"] li, [data-baseweb="popover"] [role="option"], [data-baseweb="menu"] * {
+    font-size: ${SB_OPTION_SIZE}px !important; font-weight: 600 !important;
+}
 
-    /* Titre "Filtres" */
-    [data-testid="stSidebar"] h2 { font-size: 34px !important; font-weight: 800 !important; color: #000 !important; }
-
-    /* Libellés (Localisation, Programme, ...) */
-    [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
-        font-size: 20px !important; font-weight: 800 !important; color: #000 !important;
-    }
-
-    /* Champs de sélection */
-    [data-testid="stSidebar"] [data-baseweb="select"] > div {
-        min-height: 54px; font-size: 18px !important; font-weight: 700 !important; color: #000 !important;
-        border: 2px solid #9AA3AF; background-color: #FFFFFF;
-    }
-    [data-testid="stSidebar"] [data-baseweb="select"] input { font-size: 18px !important; font-weight: 700 !important; }
-    [data-testid="stSidebar"] [data-baseweb="select"] input::placeholder { color: #374151 !important; opacity: 1; font-weight: 700; }
-
-    /* Étiquettes sélectionnées dans les multiselect */
-    [data-testid="stSidebar"] [data-baseweb="tag"] { font-size: 17px !important; font-weight: 700 !important; }
-
-    /* Liste déroulante des options */
-    [data-baseweb="popover"] li, [data-baseweb="popover"] [role="option"] {
-        font-size: 18px !important; font-weight: 600 !important;
-    }
-
-    /* ---- Onglets (VUE 360, Waterfall, ...) ---- */
-    [data-baseweb="tab-list"] { gap: 10px; border-bottom: 2px solid #E8703A; padding-top: 8px; }
-    button[data-baseweb="tab"] {
-        height: 60px; padding: 0 30px; background-color: #F3F4F6;
-        border-radius: 12px 12px 0 0; transition: all 0.2s ease;
-    }
-    button[data-baseweb="tab"] p, button[data-baseweb="tab"] div {
-        font-size: 22px !important; font-weight: 800 !important; color: #374151 !important;
-    }
-    button[data-baseweb="tab"]:hover { background-color: #FDE5D8; }
-    button[data-baseweb="tab"]:hover p { color: #E8703A !important; }
-
-    /* Onglet actif : fond orange, texte blanc */
-    button[data-baseweb="tab"][aria-selected="true"] { background-color: #E8703A; box-shadow: 0 -2px 8px rgba(232,112,58,0.35); }
-    button[data-baseweb="tab"][aria-selected="true"] p,
-    button[data-baseweb="tab"][aria-selected="true"] div { color: #FFFFFF !important; }
-
-    /* Soulignement natif de Streamlit */
-    [data-baseweb="tab-highlight"] { background-color: #000000 !important; height: 4px !important; }
-    [data-baseweb="tab-border"] { background-color: transparent !important; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+/* ===== Onglets ===== */
+[data-baseweb="tab-list"] { gap: ${TAB_GAP}px; border-bottom: 3px solid ${TAB_ACTIVE_BG}; padding-top: 8px; }
+button[data-baseweb="tab"], [data-testid="stTabs"] button[role="tab"] {
+    height: ${TAB_HEIGHT}px !important; padding: 0 ${TAB_PADDING_X}px !important; background-color: ${TAB_BG};
+    border-radius: 12px 12px 0 0; transition: all 0.2s ease;
+}
+button[data-baseweb="tab"] p, button[data-baseweb="tab"] div, button[data-baseweb="tab"] span,
+[data-testid="stTabs"] button[role="tab"] p, [data-testid="stTabs"] button[role="tab"] span {
+    font-size: ${TAB_FONT_SIZE}px !important; font-weight: 800 !important; color: ${TAB_TEXT} !important;
+}
+button[data-baseweb="tab"]:hover { background-color: #FDE5D8; }
+button[data-baseweb="tab"]:hover p { color: ${TAB_ACTIVE_BG} !important; }
+button[data-baseweb="tab"][aria-selected="true"],
+[data-testid="stTabs"] button[role="tab"][aria-selected="true"] { background-color: ${TAB_ACTIVE_BG}; }
+button[data-baseweb="tab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] div,
+button[data-baseweb="tab"][aria-selected="true"] span,
+[data-testid="stTabs"] button[role="tab"][aria-selected="true"] p { color: ${TAB_ACTIVE_TEXT} !important; }
+[data-baseweb="tab-highlight"] { background-color: #000000 !important; height: 4px !important; }
+[data-baseweb="tab-border"] { background-color: transparent !important; }
+</style>
+""")
+st.markdown(_CSS.safe_substitute(globals()), unsafe_allow_html=True)
 
 
 def img_b64(path):
@@ -129,7 +150,7 @@ def space(x):
 
 
 def bold(t):
-    return f"<b>{t}</b>"
+    return f"<b>{t}</b>" if NUM_BOLD else t
 
 
 @st.cache_data
@@ -180,10 +201,10 @@ def evo_chart(s):
     fig = go.Figure(go.Bar(
         x=[fm(d) for d in s.index], y=s.values, marker_color=ORANGE,
         text=[bold(human(v)) for v in s.values], textposition="outside",
-        textfont=dict(size=FS_EVO, color="#000000"), outsidetextfont=dict(size=FS_EVO, color="#000000"),
+        textfont=dict(size=FS_EVO, color=NUM_COLOR), outsidetextfont=dict(size=FS_EVO, color=NUM_COLOR),
         cliponaxis=False))
-    fig.update_layout(height=340, margin=dict(t=50, b=10, l=10, r=10), yaxis_visible=False,
-                      xaxis=dict(tickfont=dict(size=FS_AXIS)))
+    fig.update_layout(height=360, margin=dict(t=60, b=10, l=10, r=10), yaxis_visible=False,
+                      xaxis=dict(tickfont=dict(size=FS_EVO_AXIS)))
     return fig
 
 
@@ -191,10 +212,10 @@ def hbar(s, height, colors=None):
     fig = go.Figure(go.Bar(
         x=s.values, y=s.index, orientation="h", marker_color=colors or ORANGE,
         text=[bold(human(v)) for v in s.values], textposition="outside",
-        textfont=dict(size=FS_HBAR, color="#000000"), outsidetextfont=dict(size=FS_HBAR, color="#000000"),
+        textfont=dict(size=FS_HBAR, color=NUM_COLOR), outsidetextfont=dict(size=FS_HBAR, color=NUM_COLOR),
         cliponaxis=False))
-    fig.update_layout(height=height, margin=dict(t=30, b=10, l=70, r=80), xaxis_visible=False,
-                      yaxis=dict(tickfont=dict(size=FS_AXIS)))
+    fig.update_layout(height=height, margin=dict(t=30, b=10, l=70, r=90), xaxis_visible=False,
+                      yaxis=dict(tickfont=dict(size=FS_HBAR_AXIS), automargin=True))
     return fig
 
 
@@ -241,16 +262,17 @@ with tabs[1]:
         bases.append(0); heights.append(end); colors.append("#F4C84B"); texts.append(bold(space(end)))
         fig = go.Figure(go.Bar(x=xs, y=heights, base=bases, marker_color=colors, text=texts,
                                textposition=["inside"] + ["outside"] * 4 + ["inside"],
-                               textfont=dict(size=FS_WATERFALL, color="#000000"),
-                               insidetextfont=dict(size=FS_WATERFALL + 2, color="#000000"),
-                               outsidetextfont=dict(size=FS_WATERFALL, color="#000000"),
+                               textfont=dict(size=FS_WATERFALL, color=NUM_COLOR),
+                               insidetextfont=dict(size=FS_WATERFALL + 2, color=NUM_COLOR),
+                               outsidetextfont=dict(size=FS_WATERFALL, color=NUM_COLOR),
                                cliponaxis=False))
         filt = " - ".join(" + ".join(v) for v in sel.values() if v)
         diff = end - start
         fig.update_layout(title=f"Waterfall Parc MoM {fm(d_from)} → {fm(d_to)}" + (f" | {filt}" if filt else ""),
                           height=560, showlegend=False, yaxis_visible=False, margin=dict(t=90, b=20),
-                          xaxis=dict(tickfont=dict(size=FS_AXIS + 1)))
-        fig.add_annotation(x=xs[3], y=start * 0.5, showarrow=False, font=dict(size=26, color="#27AE60" if diff >= 0 else "#E74C3C"),
+                          xaxis=dict(tickfont=dict(size=FS_WATERFALL_AXIS)))
+        fig.add_annotation(x=xs[3], y=start * 0.5, showarrow=False,
+                           font=dict(size=FS_WATERFALL_DELTA, color="#27AE60" if diff >= 0 else "#E74C3C"),
                            text=f"<b>Δ {space(diff)} ({diff / start * 100:+.2f}%)</b>")
         st.plotly_chart(fig, use_container_width=True, key="waterfall")
 
@@ -299,7 +321,7 @@ def detail(col):
                              size_max=35, zoom=5.5, center={"lat": 33.9, "lon": 9.5},
                              map_style="open-street-map", height=600, color_discrete_sequence=["#1E90FF"])
         fig.update_traces(marker=dict(opacity=0.7))
-        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), hoverlabel=dict(font_size=16))
+        fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), hoverlabel=dict(font_size=FS_MAP_HOVER))
         st.plotly_chart(fig, use_container_width=True, key=f"map_{col}")
     with c2:
         st.markdown(f"**{title} · évolution mensuelle**")
@@ -310,11 +332,11 @@ def detail(col):
     with d1:
         st.markdown(f"**Classement des régions · {title}**")
         rk = r.dropna().sort_values()
-        st.plotly_chart(hbar(rk, 700), use_container_width=True, key=f"rank_{col}")
+        st.plotly_chart(hbar(rk, 720), use_container_width=True, key=f"rank_{col}")
     with d2:
         st.markdown(f"**Régions · MoM** ({fm(prev_d)} → {fm(mois_sel)})")
         mom = (r - rp).dropna().sort_values()
-        st.plotly_chart(hbar(mom, 700, [good if v >= 0 else bad for v in mom.values]),
+        st.plotly_chart(hbar(mom, 720, [good if v >= 0 else bad for v in mom.values]),
                         use_container_width=True, key=f"mom_{col}")
     with d3:
         st.markdown(f"**Régions · YoY** ({fm(yago_d)} → {fm(mois_sel)})")
@@ -322,7 +344,7 @@ def detail(col):
         if yoy.empty:
             st.info("Pas de données pour le même mois de l'année précédente.")
         else:
-            st.plotly_chart(hbar(yoy, 700, [good if v >= 0 else bad for v in yoy.values]),
+            st.plotly_chart(hbar(yoy, 720, [good if v >= 0 else bad for v in yoy.values]),
                             use_container_width=True, key=f"yoy_{col}")
 
 
