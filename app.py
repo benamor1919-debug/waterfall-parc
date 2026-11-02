@@ -15,7 +15,7 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
-APP_VERSION = "v7"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+APP_VERSION = "v8"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
 
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
@@ -57,7 +57,8 @@ CARD_SHADOW = "0 4px 14px rgba(0,0,0,0.10)"  # ombre des cartes
 SUBTITLE_SIZE = 28         # grands titres (ex. "Base active · évolution mensuelle")
 CHART_TITLE_SIZE = 20      # titres au-dessus des graphiques et de la carte
 METRIC_LABEL_SIZE = 18     # petit titre des indicateurs (MoM, YoY...)
-METRIC_VALUE_SIZE = 38     # grand chiffre des indicateurs
+METRIC_VALUE_SIZE = 34     # grand chiffre des indicateurs
+VUE_COLS = [5, 2]          # largeur graphique / indicateurs dans VUE 360 (augmente le 2nd pour élargir les cartes MoM/YoY)
 METRIC_DELTA_SIZE = 16     # pourcentage sous l'indicateur
 # =====================================================================
 
@@ -95,10 +96,13 @@ _CSS = Template("""
 }
 [data-testid="stMetric"] {
     background: ${CARD_BG}; border-radius: ${CARD_RADIUS}px; box-shadow: ${CARD_SHADOW};
-    padding: 14px 18px; border-left: 7px solid ${ORANGE}; margin-bottom: 10px;
+    padding: 14px 12px 14px 16px; border-left: 7px solid ${ORANGE}; margin-bottom: 10px;
 }
 [data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * { font-size: ${METRIC_LABEL_SIZE}px !important; font-weight: 700 !important; color: #4B5563 !important; }
-[data-testid="stMetricValue"], [data-testid="stMetricValue"] * { font-size: ${METRIC_VALUE_SIZE}px !important; font-weight: 800 !important; color: #000 !important; }
+[data-testid="stMetricValue"], [data-testid="stMetricValue"] * {
+    font-size: ${METRIC_VALUE_SIZE}px !important; font-weight: 800 !important; color: #000 !important;
+    overflow: visible !important; text-overflow: clip !important; white-space: nowrap !important;
+}
 [data-testid="stMetricDelta"], [data-testid="stMetricDelta"] * { font-size: ${METRIC_DELTA_SIZE}px !important; font-weight: 700 !important; }
 
 /* ===== Barre latérale ===== */
@@ -283,7 +287,7 @@ with tabs[0]:
     for i, col in enumerate(["base_actif", "churn", "rev_actif", "arpu"]):
         with cols[i % 2]:
             st.subheader(f"{TITRES[col]} · évolution mensuelle")
-            c1, c2 = st.columns([3, 1])
+            c1, c2 = st.columns(VUE_COLS)
             c1.plotly_chart(evo_chart(m[col]), use_container_width=True, key=f"vue_{col}")
             cur = m[col].get(mois_sel)
             show_delta(c2, "MoM", cur, m[col].get(prev_d), col)
