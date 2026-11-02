@@ -29,6 +29,44 @@ COORD = {  # latitude, longitude des gouvernorats
 }
 
 st.set_page_config(page_title="GeoPulse", page_icon="📡", layout="wide")
+
+# ---- Style de la barre latérale (filtres) : plus grande, en gras, plus lisible ----
+st.markdown(
+    """
+    <style>
+    /* Largeur et fond de la barre */
+    [data-testid="stSidebar"][aria-expanded="true"] { min-width: 360px; width: 360px; }
+    [data-testid="stSidebar"] { background-color: #E4E7EC; }
+
+    /* Titre "Filtres" */
+    [data-testid="stSidebar"] h2 { font-size: 34px !important; font-weight: 800 !important; color: #000 !important; }
+
+    /* Libellés (Localisation, Programme, ...) */
+    [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+        font-size: 20px !important; font-weight: 800 !important; color: #000 !important;
+    }
+
+    /* Champs de sélection */
+    [data-testid="stSidebar"] [data-baseweb="select"] > div {
+        min-height: 54px; font-size: 18px !important; font-weight: 700 !important; color: #000 !important;
+        border: 2px solid #9AA3AF; background-color: #FFFFFF;
+    }
+    [data-testid="stSidebar"] [data-baseweb="select"] input { font-size: 18px !important; font-weight: 700 !important; }
+    [data-testid="stSidebar"] [data-baseweb="select"] input::placeholder { color: #374151 !important; opacity: 1; font-weight: 700; }
+
+    /* Étiquettes sélectionnées dans les multiselect */
+    [data-testid="stSidebar"] [data-baseweb="tag"] { font-size: 17px !important; font-weight: 700 !important; }
+
+    /* Liste déroulante des options */
+    [data-baseweb="popover"] li, [data-baseweb="popover"] [role="option"] {
+        font-size: 18px !important; font-weight: 600 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 def img_b64(path):
     if os.path.exists(path):
         with open(path, "rb") as fh:
