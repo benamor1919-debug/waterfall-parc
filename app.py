@@ -61,6 +61,27 @@ st.markdown(
     [data-baseweb="popover"] li, [data-baseweb="popover"] [role="option"] {
         font-size: 18px !important; font-weight: 600 !important;
     }
+
+    /* ---- Onglets (VUE 360, Waterfall, ...) ---- */
+    [data-baseweb="tab-list"] { gap: 10px; border-bottom: 2px solid #E8703A; padding-top: 8px; }
+    button[data-baseweb="tab"] {
+        height: 60px; padding: 0 30px; background-color: #F3F4F6;
+        border-radius: 12px 12px 0 0; transition: all 0.2s ease;
+    }
+    button[data-baseweb="tab"] p, button[data-baseweb="tab"] div {
+        font-size: 22px !important; font-weight: 800 !important; color: #374151 !important;
+    }
+    button[data-baseweb="tab"]:hover { background-color: #FDE5D8; }
+    button[data-baseweb="tab"]:hover p { color: #E8703A !important; }
+
+    /* Onglet actif : fond orange, texte blanc */
+    button[data-baseweb="tab"][aria-selected="true"] { background-color: #E8703A; box-shadow: 0 -2px 8px rgba(232,112,58,0.35); }
+    button[data-baseweb="tab"][aria-selected="true"] p,
+    button[data-baseweb="tab"][aria-selected="true"] div { color: #FFFFFF !important; }
+
+    /* Soulignement natif de Streamlit */
+    [data-baseweb="tab-highlight"] { background-color: #000000 !important; height: 4px !important; }
+    [data-baseweb="tab-border"] { background-color: transparent !important; }
     </style>
     """,
     unsafe_allow_html=True,
