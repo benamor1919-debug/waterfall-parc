@@ -16,7 +16,7 @@ VALS = ["base_actif", "churn", "rev_actif", "ga_30", "react_30"]
 # =====================================================================
 #                 PARAMÈTRES D'AFFICHAGE  (modifie ici)
 # =====================================================================
-APP_VERSION = "v15"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
+APP_VERSION = "v16"        # affichée en bas de la barre latérale : sert à vérifier que le bon code est en ligne
 
 # --- Chiffres des graphiques (taille en px) ---
 NUM_BOLD = True            # True = chiffres en gras, False = normal
@@ -173,6 +173,19 @@ _CSS = Template("""
 [role="tab"][aria-selected="true"], [role="tab"][aria-selected="true"] * { color: ${TAB_ACTIVE_TEXT} !important; }
 [data-baseweb="tab-highlight"] { background-color: #000000 !important; height: 4px !important; }
 [data-baseweb="tab-border"] { background-color: transparent !important; }
+/* ===== Navigation (radio horizontal stylé comme des onglets) ===== */
+.st-key-nav [role="radiogroup"] { gap: ${TAB_GAP}px !important; border-bottom: 3px solid ${TAB_ACTIVE_BG}; padding-top: 8px; flex-wrap: wrap; }
+.st-key-nav label[data-baseweb="radio"] {
+    height: ${TAB_HEIGHT}px; padding: 0 ${TAB_PADDING_X}px !important; margin: 0 !important; background-color: ${TAB_BG};
+    border-radius: 12px 12px 0 0; align-items: center; cursor: pointer; transition: all 0.2s ease;
+}
+.st-key-nav label[data-baseweb="radio"] > div:first-child { display: none !important; }
+.st-key-nav label[data-baseweb="radio"] p {
+    font-size: ${TAB_FONT_SIZE}px !important; font-weight: 800 !important; color: ${TAB_TEXT} !important; margin: 0 !important;
+}
+.st-key-nav label[data-baseweb="radio"]:hover { background-color: #FDE5D8; }
+.st-key-nav label[data-baseweb="radio"]:has(input:checked) { background-color: ${TAB_ACTIVE_BG}; }
+.st-key-nav label[data-baseweb="radio"]:has(input:checked) p { color: ${TAB_ACTIVE_TEXT} !important; }
 """)
 _css_txt = _CSS.safe_substitute(globals())
 
@@ -348,10 +361,13 @@ if geo_sel:
             "Les classements régionaux restent complets (sélection en surbrillance).")
     cB.button("✖ Effacer", key="clear_geo", on_click=set_geo, args=([],))
 
-tabs = st.tabs(["**VUE 360**", "**Waterfall**", "**Base active**", "**Churn**", "**Revenu actif**", "**ARPU**"])
+PAGES = ["VUE 360", "Waterfall", "Base active", "Churn", "Revenu actif", "ARPU"]
+# st.radio garde la page active après un st.rerun() (contrairement à st.tabs qui revenait sur VUE 360)
+with st.container(key="nav"):
+    page = st.radio("Page", PAGES, horizontal=True, key="page", label_visibility="collapsed")
 
 # ---------------- VUE 360 ----------------
-with tabs[0]:
+if page == "VUE 360":
     cols = st.columns(2)
     for i, col in enumerate(["base_actif", "churn", "rev_actif", "arpu"]):
         with cols[i % 2]:
@@ -363,7 +379,7 @@ with tabs[0]:
             show_delta(c2, "YoY", cur, m[col].get(yago_d), col)
 
 # ---------------- Waterfall ----------------
-with tabs[1]:
+if page == "Waterfall":
     c1, c2 = st.columns(2)
     d_from = c1.selectbox("Mois de départ", dates, index=max(len(dates) - 2, 0), format_func=fm, key="wf_from")
     d_to = c2.selectbox("Mois d'arrivée", dates, index=len(dates) - 1, format_func=fm, key="wf_to")
@@ -587,6 +603,6 @@ def detail(col):
                             use_container_width=True, key=f"yoy_{col}")
 
 
-for tab, col in zip(tabs[2:], ["base_actif", "churn", "rev_actif", "arpu"]):
-    with tab:
-        detail(col)
+_DETAIL = {"Base active": "base_actif", "Churn": "churn", "Revenu actif": "rev_actif", "ARPU": "arpu"}
+if page in _DETAIL:
+    detail(_DETAIL[page])
